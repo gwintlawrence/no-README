@@ -1,0 +1,49 @@
+name: F4P ISM Auto-Fetcher
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  fetch-ism-data:
+    name: Fetch ISM PMI from FRED
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run ISM fetcher
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          python ism_fetcher.py
+
+      - name: Commit updated data
+        run: |
+          git config user.name "F4P Bot"
+          git config user.email "f4p-bot@fishin4pips.com"
+          git add data/ logs/ || true
+          git diff --staged --quiet || git commit -m "Auto-update macro data"
+          git push || true
+
+      - name: Upload fetch logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fetch-logs-${{ github.run_id }}
+          path: logs/
+          retention-days: 7
