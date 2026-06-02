@@ -1,4 +1,4 @@
-"""
+    """
 F4P MACRO DATA FETCHER
 GWL Trading Team — Fishin4Pips System
 GitHub Actions script — runs daily (FRED) and weekly Friday (COT)
@@ -33,6 +33,7 @@ SHEET TARGET:
 import os
 import json
 import requests
+import time
 import datetime
 import gzip
 import csv
@@ -327,6 +328,7 @@ def main():
         except Exception as e:
             print(f'    → FAILED: {e}')
             fred_results[series_id] = (None, None)
+        time.sleep(1)  # Avoid FRED rate limiting
 
     # ── STEP 2: COT (Fridays only) ───────────────────────────────
     cot_results = {}
@@ -353,3 +355,5 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+    
