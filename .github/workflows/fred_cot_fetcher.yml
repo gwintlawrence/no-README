@@ -1,0 +1,59 @@
+# ════════════════════════════════════════════════════════════════
+# F4P MACRO DATA FETCHER — GITHUB ACTIONS WORKFLOW
+# GWL Trading Team · Fishin4Pips System
+#
+# FILE LOCATION IN REPO: .github/workflows/fred_cot_fetcher.yml
+#
+# WHAT THIS DOES:
+#   - Runs every day at 14:00 UTC (10am ET) → FRED indicators
+#   - Runs every Friday at 21:00 UTC (5pm ET) → FRED + COT data
+#   - Writes to FRED AUTO tab in your Google Sheet
+#   - Never touches any other tab
+#
+# SECRETS NEEDED IN GITHUB (Settings → Secrets → Actions):
+#   FRED_API_KEY        — your FRED API key (free at fred.stlouisfed.org)
+#   GOOGLE_CREDENTIALS  — your Google service account JSON (see setup doc)
+# ════════════════════════════════════════════════════════════════
+
+name: F4P Macro Data Fetcher
+
+on:
+  schedule:
+    # Daily run at 14:00 UTC (10:00 AM ET) — FRED indicators
+    - cron: '0 14 * * *'
+    # Friday run at 21:00 UTC (5:00 PM ET) — FRED + COT
+    # COT releases ~3:30pm ET. We wait until 5pm to ensure it is live.
+    - cron: '0 21 * * 5'
+  # Allow manual trigger from GitHub Actions tab
+  workflow_dispatch:
+
+jobs:
+  fetch-macro-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests google-auth google-auth-oauthlib google-api-python-client
+
+      - name: Run F4P data fetcher
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: |
+          python fred_cot_fetcher.py
+
+      - name: Confirm completion
+        run: |
+          echo "F4P data fetch complete — $(date -u)"
+          echo "Check FRED AUTO tab in Google Sheet:"
+          echo "https://docs.google.com/spreadsheets/d/1fhYqdylvYWzU0cdiM2qrkMbv-UeOkWfM"
