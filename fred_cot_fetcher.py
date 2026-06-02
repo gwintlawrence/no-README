@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 
 FRED_API_KEY      = os.environ['FRED_API_KEY']
 GOOGLE_CREDS_JSON = os.environ['GOOGLE_CREDENTIALS']
-SPREADSHEET_ID    = '1fhYqdylvYWzU0cdiM2qrkMbv-UeOkWfM'
+SPREADSHEET_ID    = '1fhYqdyIvYWzU0cdiM2qrkMbv-UeOkWfM'
 TAB_NAME          = 'FRED AUTO'
 
 FRED_SERIES = [
