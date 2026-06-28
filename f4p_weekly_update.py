@@ -103,54 +103,70 @@ The rows array must contain exactly {len(currency_batch) * len(INDICATORS)} entr
 
 def call_claude(prompt: str) -> dict:
     """
-    Calls Claude with the server-side web_search tool. Anthropic executes the
-    search itself and returns results inline in the same response - Claude can
-    call the tool many times within one response automatically. We do not need
-    to manually manage a tool-use loop for server-side tools.
+    Calls Claude with the server-side web_search tool. For large research tasks,
+    Claude may return stop_reason='pause_turn' partway through - this means it is
+    still actively researching and needs another turn to continue, NOT that it
+    failed. We must continue the SAME conversation (resend its own content back)
+    until it reaches a real stop (end_turn) with a final text answer.
     """
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
-    message = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=16000,
-        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 40}],
-        messages=[{"role": "user", "content": prompt}],
+    messages = [{"role": "user", "content": prompt}]
+    max_continuations = 6  # safety cap - each continuation lets it keep researching
+
+    for attempt in range(max_continuations):
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=16000,
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 40}],
+            messages=messages,
+        )
+
+        print(f"[F4P Weekly Update] Attempt {attempt+1}: stop_reason={message.stop_reason}, "
+              f"blocks={len(message.content)}")
+
+        if message.stop_reason == "max_tokens":
+            raise RuntimeError(
+                "Claude hit the max_tokens limit before writing a final answer. "
+                "Split the request into smaller batches (fewer currencies per call)."
+            )
+
+        if message.stop_reason == "pause_turn":
+            # Still researching - feed its own turn back in verbatim and let it continue.
+            print("[F4P Weekly Update] pause_turn received - continuing same turn...")
+            messages.append({"role": "assistant", "content": message.content})
+            continue
+
+        # Any other stop_reason (end_turn, stop_sequence, etc.) means it's done.
+        full_text = "".join(b.text for b in message.content if b.type == "text").strip()
+
+        if not full_text:
+            print("[F4P Weekly Update] No text block found. Block types were: "
+                  f"{[b.type for b in message.content]}")
+            raise RuntimeError(
+                f"Claude stopped (stop_reason={message.stop_reason}) with no final "
+                f"text block to parse."
+            )
+
+        if full_text.startswith("```"):
+            full_text = full_text.split("```", 1)[1]
+            if full_text.startswith("json"):
+                full_text = full_text[4:]
+            full_text = full_text.rsplit("```", 1)[0].strip()
+
+        try:
+            return json.loads(full_text)
+        except json.JSONDecodeError:
+            print("[F4P Weekly Update] JSON parse failed. First 800 chars of response:")
+            print(full_text[:800])
+            print("[F4P Weekly Update] Last 800 chars of response:")
+            print(full_text[-800:])
+            raise
+
+    raise RuntimeError(
+        f"Hit max_continuations ({max_continuations}) without reaching a final answer. "
+        f"This batch may be too large even when split - consider 1 currency per call."
     )
-
-    print(f"[F4P Weekly Update] stop_reason={message.stop_reason}, "
-          f"blocks={len(message.content)}, "
-          f"block_types={[b.type for b in message.content]}")
-
-    if message.stop_reason == "max_tokens":
-        raise RuntimeError(
-            "Claude hit the max_tokens limit before writing a final answer. "
-            "Split the request into smaller batches (fewer currencies per call)."
-        )
-
-    full_text = "".join(b.text for b in message.content if b.type == "text").strip()
-
-    if not full_text:
-        print("[F4P Weekly Update] No text block found. Raw content dump follows:")
-        print(message.content)
-        raise RuntimeError(
-            "Claude's response had no final text block to parse. "
-            "See raw content logged above for what it actually returned."
-        )
-
-    if full_text.startswith("```"):
-        full_text = full_text.split("```", 1)[1]
-        if full_text.startswith("json"):
-            full_text = full_text[4:]
-        full_text = full_text.rsplit("```", 1)[0].strip()
-
-    try:
-        return json.loads(full_text)
-    except json.JSONDecodeError:
-        print("[F4P Weekly Update] JSON parse failed. First 800 chars of response:")
-        print(full_text[:800])
-        print("[F4P Weekly Update] Last 800 chars of response:")
-        print(full_text[-800:])
-        raise
 
 
 def connect_sheet():
@@ -251,7 +267,7 @@ def main():
 
     all_rows = []
     all_flags = []
-    batch_size = 2  # 2 currencies per call = 30 indicators per call, much more reliable
+    batch_size = 1  # 1 currency per call (15 indicators) - most reliable, avoids pause_turn loops
 
     for batch_num, batch in enumerate(chunk(CURRENCIES, batch_size), start=1):
         print(f"[F4P Weekly Update] Batch {batch_num}: {batch}")
