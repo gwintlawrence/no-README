@@ -56,14 +56,14 @@ HEADER_ROW = [
 RANKINGS_HEADER = ["Rank", "Currency", "Total Score", "Bias"]
 
 
-def build_prompt(today: str) -> str:
+def build_prompt(today: str, currency_batch: list) -> str:
     indicator_list = "\n".join(f"  {i+1}. {name}" for i, name in enumerate(INDICATORS))
-    currency_list = ", ".join(CURRENCIES)
+    currency_list = ", ".join(currency_batch)
     return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) institutional Hub Data pack for the week of {today}.
 
 Use web search. Use only official primary sources: central bank websites, national statistics offices, ismworld.org, FRED (fred.stlouisfed.org), OECD, IMF. Never fabricate a number. If a number is genuinely unavailable, write "data unavailable" and score it 0.
 
-Produce the LATEST RELEASED data (as of {today}) for ALL 8 currencies: {currency_list}.
+Produce the LATEST RELEASED data (as of {today}) for these currencies ONLY: {currency_list}.
 
 For EACH currency, give all 15 indicators in this exact order:
 {indicator_list}
@@ -78,7 +78,6 @@ Institutional Analysis = one sentence. State the reading, compare to expectation
 Return your ENTIRE response as a single valid JSON object and NOTHING else - no preamble, no markdown fences, no commentary. Use this exact schema:
 
 {{
-  "data_cutoff": "Week of {today}",
   "rows": [
     {{
       "currency": "USD",
@@ -95,43 +94,63 @@ Return your ENTIRE response as a single valid JSON object and NOTHING else - no 
       "source_url": "https://..."
     }}
   ],
-  "rankings": [
-    {{"rank": 1, "currency": "USD", "total_score": 12, "bias": "Mild Bullish"}}
-  ],
   "data_unavailable_flags": ["List any indicator/currency combos you could not find data for, or empty list"]
 }}
 
-The rows array must contain exactly {len(CURRENCIES) * len(INDICATORS)} entries (8 currencies x 15 indicators each).
-The rankings array must contain exactly 8 entries, sorted strongest to weakest (rank 1 = highest total_score).
-Bias labels: above +15 Strong Bullish, +6 to +15 Mild Bullish, -5 to +5 Neutral, -15 to -6 Mild Bearish, below -15 Strong Bearish.
+The rows array must contain exactly {len(currency_batch) * len(INDICATORS)} entries ({len(currency_batch)} currencies x 15 indicators each). Do not include currencies other than the ones listed above. Do not include a rankings array - that will be computed separately.
 """
 
 
 def call_claude(prompt: str) -> dict:
+    """
+    Calls Claude with the server-side web_search tool. Anthropic executes the
+    search itself and returns results inline in the same response - Claude can
+    call the tool many times within one response automatically. We do not need
+    to manually manage a tool-use loop for server-side tools.
+    """
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=16000,
-        tools=[{"type": "web_search_20250305", "name": "web_search"}],
+        tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 40}],
         messages=[{"role": "user", "content": prompt}],
     )
 
-    # Concatenate all text blocks (web search may interleave tool_use/tool_result blocks)
-    full_text = ""
-    for block in message.content:
-        if block.type == "text":
-            full_text += block.text
+    print(f"[F4P Weekly Update] stop_reason={message.stop_reason}, "
+          f"blocks={len(message.content)}, "
+          f"block_types={[b.type for b in message.content]}")
 
-    full_text = full_text.strip()
-    # Defensive cleanup in case the model wraps in a code fence despite instructions
+    if message.stop_reason == "max_tokens":
+        raise RuntimeError(
+            "Claude hit the max_tokens limit before writing a final answer. "
+            "Split the request into smaller batches (fewer currencies per call)."
+        )
+
+    full_text = "".join(b.text for b in message.content if b.type == "text").strip()
+
+    if not full_text:
+        print("[F4P Weekly Update] No text block found. Raw content dump follows:")
+        print(message.content)
+        raise RuntimeError(
+            "Claude's response had no final text block to parse. "
+            "See raw content logged above for what it actually returned."
+        )
+
     if full_text.startswith("```"):
-        full_text = full_text.split("```")[1]
+        full_text = full_text.split("```", 1)[1]
         if full_text.startswith("json"):
             full_text = full_text[4:]
-        full_text = full_text.rsplit("```", 1)[0]
+        full_text = full_text.rsplit("```", 1)[0].strip()
 
-    return json.loads(full_text)
+    try:
+        return json.loads(full_text)
+    except json.JSONDecodeError:
+        print("[F4P Weekly Update] JSON parse failed. First 800 chars of response:")
+        print(full_text[:800])
+        print("[F4P Weekly Update] Last 800 chars of response:")
+        print(full_text[-800:])
+        raise
 
 
 def connect_sheet():
@@ -184,43 +203,100 @@ def write_hub_data(spreadsheet, data: dict, today: str):
         ws.update([["DATA UNAVAILABLE - VERIFY MANUALLY:"], *[[f] for f in flags]], "N3")
 
 
-def write_rankings(spreadsheet, data: dict):
+def compute_rankings(all_rows: list) -> list:
+    """Sum scores per currency locally in Python - far more reliable than
+    asking the model to do arithmetic across a huge response."""
+    totals = {}
+    for row in all_rows:
+        ccy = row["currency"]
+        totals[ccy] = totals.get(ccy, 0) + int(row.get("score", 0))
+
+    def bias_label(score):
+        if score > 15:
+            return "Strong Bullish"
+        if score >= 6:
+            return "Mild Bullish"
+        if score >= -5:
+            return "Neutral"
+        if score >= -15:
+            return "Mild Bearish"
+        return "Strong Bearish"
+
+    ranked = sorted(totals.items(), key=lambda kv: kv[1], reverse=True)
+    return [
+        {"rank": i + 1, "currency": ccy, "total_score": score, "bias": bias_label(score)}
+        for i, (ccy, score) in enumerate(ranked)
+    ]
+
+
+def write_rankings(spreadsheet, rankings: list):
     ws = get_or_create_tab(spreadsheet, RANKINGS_TAB_NAME, rows=20, cols=4)
 
     values = [RANKINGS_HEADER]
-    for r in data["rankings"]:
+    for r in rankings:
         values.append([r["rank"], r["currency"], r["total_score"], r["bias"]])
 
     ws.update(values, "A1")
     ws.format("A1:D1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
 
 
+def chunk(lst, size):
+    for i in range(0, len(lst), size):
+        yield lst[i:i + size]
+
+
 def main():
     today = datetime.now(timezone.utc).strftime("%B %d, %Y")
     print(f"[F4P Weekly Update] Starting run for {today}")
 
-    prompt = build_prompt(today)
+    all_rows = []
+    all_flags = []
+    batch_size = 2  # 2 currencies per call = 30 indicators per call, much more reliable
 
-    print("[F4P Weekly Update] Calling Claude with web search...")
-    data = call_claude(prompt)
+    for batch_num, batch in enumerate(chunk(CURRENCIES, batch_size), start=1):
+        print(f"[F4P Weekly Update] Batch {batch_num}: {batch}")
+        prompt = build_prompt(today, batch)
 
-    expected_rows = len(CURRENCIES) * len(INDICATORS)
-    actual_rows = len(data.get("rows", []))
-    if actual_rows != expected_rows:
-        print(f"[WARNING] Expected {expected_rows} rows, got {actual_rows}. Proceeding anyway.")
+        try:
+            data = call_claude(prompt)
+        except Exception as exc:
+            print(f"[F4P Weekly Update] Batch {batch_num} ({batch}) FAILED: {exc}")
+            print("[F4P Weekly Update] Continuing with remaining batches...")
+            all_flags.append(f"ENTIRE BATCH FAILED: {batch} - {exc}")
+            continue
+
+        batch_rows = data.get("rows", [])
+        expected = len(batch) * len(INDICATORS)
+        if len(batch_rows) != expected:
+            print(f"[WARNING] Batch {batch_num}: expected {expected} rows, got {len(batch_rows)}.")
+
+        all_rows.extend(batch_rows)
+        all_flags.extend(data.get("data_unavailable_flags", []))
+
+    if not all_rows:
+        raise RuntimeError("All batches failed - no data collected at all. Aborting before writing to sheet.")
+
+    print(f"[F4P Weekly Update] Collected {len(all_rows)} total rows across all batches.")
+
+    rankings = compute_rankings(all_rows)
+    full_data = {"data_cutoff": f"Week of {today}", "rows": all_rows, "data_unavailable_flags": all_flags}
 
     print("[F4P Weekly Update] Connecting to Google Sheet...")
     spreadsheet = connect_sheet()
 
-    print(f"[F4P Weekly Update] Writing {actual_rows} rows to '{SHEET_TAB_NAME}' tab...")
-    write_hub_data(spreadsheet, data, today)
+    print(f"[F4P Weekly Update] Writing {len(all_rows)} rows to '{SHEET_TAB_NAME}' tab...")
+    write_hub_data(spreadsheet, full_data, today)
 
     print(f"[F4P Weekly Update] Writing rankings to '{RANKINGS_TAB_NAME}' tab...")
-    write_rankings(spreadsheet, data)
+    write_rankings(spreadsheet, rankings)
 
-    flags = data.get("data_unavailable_flags", [])
-    if flags:
-        print(f"[F4P Weekly Update] {len(flags)} indicator(s) flagged as unavailable - check sheet.")
+    if all_flags:
+        print(f"[F4P Weekly Update] {len(all_flags)} item(s) flagged as unavailable/failed - check sheet.")
+
+    expected_total = len(CURRENCIES) * len(INDICATORS)
+    if len(all_rows) < expected_total:
+        print(f"[F4P Weekly Update] WARNING: only {len(all_rows)}/{expected_total} rows collected. "
+              f"Glenise should verify missing currencies manually this week.")
 
     print("[F4P Weekly Update] Done.")
 
