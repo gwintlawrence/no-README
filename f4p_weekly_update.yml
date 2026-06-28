@@ -1,0 +1,38 @@
+name: F4P Weekly Hub Data Update
+
+# Runs every Sunday at 6:00 AM ET (10:00 UTC, adjusts for DST automatically is NOT
+# handled by cron - 10:00 UTC = 6am EDT in summer, 5am EST in winter. Adjust below
+# if you want a fixed local time year-round.)
+on:
+  schedule:
+    - cron: "0 10 * * 0"   # Sunday 10:00 UTC
+  workflow_dispatch: {}      # lets you click "Run workflow" manually in GitHub UI
+
+jobs:
+  update-hub-data:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install anthropic gspread google-auth
+
+      - name: Run F4P weekly update
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+        run: python f4p_weekly_update.py
+
+      - name: Report failure
+        if: failure()
+        run: echo "::error::F4P weekly update failed. Check the log above. Glenise should verify data manually this week."
