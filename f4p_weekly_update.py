@@ -56,6 +56,52 @@ HEADER_ROW = [
 RANKINGS_HEADER = ["Rank", "Currency", "Total Score", "Bias"]
 
 
+def extract_json_object(text: str) -> str:
+    """
+    Claude sometimes narrates its reasoning ('Now let me compile the JSON...')
+    before or after the actual JSON object, even when explicitly told not to.
+    This finds the first '{' and walks forward counting brace depth (respecting
+    strings, so braces inside quoted text don't throw off the count) to find
+    the matching closing '}' - returning just that substring.
+    """
+    start = text.find("{")
+    if start == -1:
+        return text  # nothing brace-like at all; let json.loads raise its own error
+
+    depth = 0
+    in_string = False
+    escape_next = False
+
+    for i in range(start, len(text)):
+        ch = text[i]
+
+        if escape_next:
+            escape_next = False
+            continue
+
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+
+        if ch == '"':
+            in_string = not in_string
+            continue
+
+        if in_string:
+            continue
+
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+
+    # Unbalanced - likely truncated mid-object. Return from start anyway so the
+    # caller's error log shows something useful for debugging.
+    return text[start:]
+
+
 def build_prompt(today: str, currency_batch: list) -> str:
     indicator_list = "\n".join(f"  {i+1}. {name}" for i, name in enumerate(INDICATORS))
     currency_list = ", ".join(currency_batch)
@@ -75,7 +121,7 @@ SCORING RULE - use this exact scale, whole numbers only:
 
 Institutional Analysis = one sentence. State the reading, compare to expectation or prior, and say what it means for the currency. Write like an institutional desk note.
 
-Return your ENTIRE response as a single valid JSON object and NOTHING else - no preamble, no markdown fences, no commentary. Use this exact schema:
+Return your ENTIRE response as a single valid JSON object and NOTHING else. Do NOT write any introductory sentence like "Now I have all the data" or "Let me compile the response" - your response must START with the character {{ and END with }}, with no other text anywhere before or after it. Use this exact schema:
 
 {{
   "rows": [
@@ -154,13 +200,15 @@ def call_claude(prompt: str) -> dict:
                 full_text = full_text[4:]
             full_text = full_text.rsplit("```", 1)[0].strip()
 
+        json_candidate = extract_json_object(full_text)
+
         try:
-            return json.loads(full_text)
+            return json.loads(json_candidate)
         except json.JSONDecodeError:
-            print("[F4P Weekly Update] JSON parse failed. First 800 chars of response:")
-            print(full_text[:800])
-            print("[F4P Weekly Update] Last 800 chars of response:")
-            print(full_text[-800:])
+            print("[F4P Weekly Update] JSON parse failed. First 800 chars of extracted candidate:")
+            print(json_candidate[:800])
+            print("[F4P Weekly Update] Last 800 chars of extracted candidate:")
+            print(json_candidate[-800:])
             raise
 
     raise RuntimeError(
