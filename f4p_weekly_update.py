@@ -237,7 +237,7 @@ def get_or_create_tab(spreadsheet, tab_name: str, rows: int, cols: int):
 
 
 def write_hub_data(spreadsheet, data: dict, today: str):
-    ws = get_or_create_tab(spreadsheet, SHEET_TAB_NAME, rows=200, cols=12)
+    ws = get_or_create_tab(spreadsheet, SHEET_TAB_NAME, rows=250, cols=12)
 
     values = [HEADER_ROW]
     for row in data["rows"]:
@@ -259,12 +259,18 @@ def write_hub_data(spreadsheet, data: dict, today: str):
     ws.update(values, "A1")
     ws.format("A1:L1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
 
-    # Stamp the cutoff date in a clearly visible cell
-    ws.update([[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]], "N1")
+    # Stamp the cutoff date and any flags in the rows directly below the data
+    # table (column A) rather than off to the side - avoids exceeding the
+    # sheet's column count regardless of how many columns the tab has.
+    footer_row = len(values) + 2
+    footer_values = [[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]]
 
     flags = data.get("data_unavailable_flags", [])
     if flags:
-        ws.update([["DATA UNAVAILABLE - VERIFY MANUALLY:"], *[[f] for f in flags]], "N3")
+        footer_values.append(["DATA UNAVAILABLE / NEEDS MANUAL CHECK:"])
+        footer_values.extend([[f] for f in flags])
+
+    ws.update(footer_values, f"A{footer_row}")
 
 
 def compute_rankings(all_rows: list) -> list:
