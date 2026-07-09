@@ -289,7 +289,7 @@ Return your ENTIRE response as a single valid JSON object and NOTHING else. Do N
   "data_unavailable_flags": ["List any pairs you could not find data for, or empty list"]
 }}
 
-The rows array must contain exactly {len(pairs)} entries, one per pair listed above."""
+The rows array must contain exactly {len(pairs)} entries, one per pair listed above. You MUST write out the complete JSON object for EVERY pair in full - never use "...", "etc.", or any other abbreviation to skip or shorten repeated data, even if pairs share similar values. Each pair's full object must be written out explicitly."""
 
 def call_claude(prompt: str) -> dict:
     """
