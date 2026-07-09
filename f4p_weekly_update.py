@@ -55,6 +55,36 @@ HEADER_ROW = [
 
 RANKINGS_HEADER = ["Rank", "Currency", "Total Score", "Bias"]
 
+CARRY_PAIRS = [
+    ("JPY", "USD"), ("JPY", "CAD"), ("JPY", "AUD"),
+    ("CHF", "USD"), ("CHF", "CAD"), ("CHF", "AUD"),
+    ("EUR", "USD"), ("EUR", "AUD"),
+    ("USD", "JPY"),
+]
+
+CENTRAL_BANKS = ["FED", "ECB", "BOE", "BOJ", "SNB", "RBA", "RBNZ", "BOC"]
+
+EXOGENOUS_PAIRS = ["GBPUSD", "EURUSD", "AUDUSD", "USDJPY", "USDCAD", "NZDUSD", "USDCHF"]
+
+CARRY_TAB_NAME = "CARRY TRADE"
+CARRY_HEADER_ROW = [
+    "Funding", "Target", "Real Rate Differential", "Carry Score",
+    "Funding Pressure", "Capital Flow", "Source"
+]
+
+CENTRAL_BANK_TAB_NAME = "CENTRAL BANK"
+CENTRAL_BANK_HEADER_ROW = [
+    "Central Bank", "Bias", "Score", "Latest Meeting",
+    "Next Meeting", "Forward Guidance Note", "Source"
+]
+
+EXOGENOUS_TAB_NAME = "EXOGENOUS"
+EXOGENOUS_HEADER_ROW = [
+    "Pair", "Base GDP %", "Quote GDP %", "Base Current Account % GDP",
+    "Quote Current Account % GDP", "Base Rate + Direction", "Quote Rate + Direction",
+    "Base Index Level", "Base Index 12mo High", "Total Score", "Bias", "Source"
+]
+
 
 def extract_json_object(text: str) -> str:
     """
@@ -145,7 +175,121 @@ Return your ENTIRE response as a single valid JSON object and NOTHING else. Do N
 
 The rows array must contain exactly {len(currency_batch) * len(INDICATORS)} entries ({len(currency_batch)} currencies x 15 indicators each). Do not include currencies other than the ones listed above. Do not include a rankings array - that will be computed separately.
 """
+def build_carry_prompt(today: str, pairs: list) -> str:
+    pair_list = "\n".join(
+        f"  {i+1}. Funding currency={f}, Target currency={t}" for i, (f, t) in enumerate(pairs)
+    )
+    return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) Carry Trade Data pack for the week of {today}.
 
+Use web search. Use only official primary sources: central bank websites, national statistics offices, FRED (fred.stlouisfed.org), OECD, IMF. Never fabricate a number.
+
+For EACH pair below, use the LATEST RELEASED policy rate and CPI YoY figures (as of {today}) to compute the real rate differential:
+  Real Rate Differential = (Target policy rate - Target CPI YoY) - (Funding policy rate - Funding CPI YoY)
+
+Pairs to compute:
+{pair_list}
+
+For each pair also provide:
+- carry_score: 0-10, where 10 = maximum attractive carry (wide positive differential, low funding pressure, strong capital flow into target)
+- funding_pressure: "Low", "Medium", or "High" (risk of funding currency squeeze / unwind risk)
+- capital_flow: "↑" (flowing into target), "↓" (flowing out), or "→" (flat/unclear)
+
+Return your ENTIRE response as a single valid JSON object and NOTHING else. Do NOT write any introductory sentence - your response must START with {{ and END with }}.
+
+{{
+  "rows": [
+    {{
+      "funding": "JPY",
+      "target": "USD",
+      "real_rate_differential": "+4.25%",
+      "carry_score": 9,
+      "funding_pressure": "Low",
+      "capital_flow": "↑",
+      "source_url": "https://..."
+    }}
+  ],
+  "data_unavailable_flags": ["List any pairs you could not find data for, or empty list"]
+}}
+
+The rows array must contain exactly {len(pairs)} entries, one per pair listed above."""
+
+
+def build_central_bank_prompt(today: str, banks: list) -> str:
+    bank_list = ", ".join(banks)
+    return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) Central Bank Data pack for the week of {today}.
+
+Use web search. Use only official primary sources: central bank websites and official statements. Never fabricate a number or quote.
+
+Produce the LATEST data (as of {today}) for these central banks ONLY: {bank_list}.
+
+For EACH central bank, provide:
+- bias: "Hawkish", "Neutral", or "Dovish"
+- score: 0-10 conviction (10 = maximum hawkish conviction, 0 = maximum dovish conviction, 5 = neutral)
+- latest_meeting: date of most recent policy meeting
+- next_meeting: date of next scheduled policy meeting
+- forward_guidance_note: ONE sentence summarizing the most recent forward guidance or statement language
+
+Return your ENTIRE response as a single valid JSON object and NOTHING else. Do NOT write any introductory sentence - your response must START with {{ and END with }}.
+
+{{
+  "rows": [
+    {{
+      "central_bank": "FED",
+      "bias": "Hawkish",
+      "score": 8,
+      "latest_meeting": "June 17, 2026",
+      "next_meeting": "July 29, 2026",
+      "forward_guidance_note": "One sentence institutional note.",
+      "source_url": "https://..."
+    }}
+  ],
+  "data_unavailable_flags": ["List any banks you could not find data for, or empty list"]
+}}
+
+The rows array must contain exactly {len(banks)} entries, one per central bank listed above."""
+
+
+def build_exogenous_prompt(today: str, pairs: list) -> str:
+    pair_list = ", ".join(pairs)
+    return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) Exogenous Drivers Data pack for the week of {today}, matching the structure of the F4P Exogenous Drivers tool.
+
+Use web search. Use only official primary sources: national statistics offices, central banks, stock exchange data, FRED, OECD, IMF. Never fabricate a number.
+
+Produce the LATEST data (as of {today}) for these pairs ONLY: {pair_list}.
+
+For EACH pair, score 4 structural drivers on a flat +/-2 scale each (total range -8 to +8):
+1. Relative GDP Growth - base country GDP% vs quote country GDP%
+2. Balance of Payments - base current account % of GDP vs quote current account % of GDP
+3. Interest Rate Differentials & Carry - base policy rate + direction (Hiking/Hold-Hawkish/Hold-Neutral/Hold-Dovish/Cutting) vs quote
+4. Stock Market Returns / Relative Wealth - base country's major index level vs its 12-month high
+
+For each pair provide the raw inputs plus:
+- total_score: sum of the 4 driver scores (-8 to +8)
+- bias: "Structurally Bullish" (base currency), "Mixed-Neutral", or "Structurally Bearish" (base currency)
+
+Return your ENTIRE response as a single valid JSON object and NOTHING else. Do NOT write any introductory sentence - your response must START with {{ and END with }}.
+
+{{
+  "rows": [
+    {{
+      "pair": "GBPUSD",
+      "base_gdp": "1.2%",
+      "quote_gdp": "2.1%",
+      "base_current_account": "-2.5%",
+      "quote_current_account": "-3.1%",
+      "base_rate_direction": "3.75% (Hold-Hawkish)",
+      "quote_rate_direction": "3.625% (Hold-Hawkish)",
+      "base_index_level": "8,150",
+      "base_index_12mo_high": "8,400",
+      "total_score": -2,
+      "bias": "Mixed-Neutral",
+      "source_url": "https://..."
+    }}
+  ],
+  "data_unavailable_flags": ["List any pairs you could not find data for, or empty list"]
+}}
+
+The rows array must contain exactly {len(pairs)} entries, one per pair listed above."""
 
 def call_claude(prompt: str) -> dict:
     """
@@ -271,7 +415,84 @@ def write_hub_data(spreadsheet, data: dict, today: str):
         footer_values.extend([[f] for f in flags])
 
     ws.update(footer_values, f"A{footer_row}")
+def write_carry_trade(spreadsheet, data: dict, today: str):
+    ws = get_or_create_tab(spreadsheet, CARRY_TAB_NAME, rows=50, cols=7)
+    values = [CARRY_HEADER_ROW]
+    for row in data["rows"]:
+        values.append([
+            row["funding"],
+            row["target"],
+            row["real_rate_differential"],
+            row["carry_score"],
+            row["funding_pressure"],
+            row["capital_flow"],
+            row.get("source_url", ""),
+        ])
+    ws.update(values, "A1")
+    ws.format("A1:G1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
 
+    footer_row = len(values) + 2
+    footer_values = [[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]]
+    flags = data.get("data_unavailable_flags", [])
+    if flags:
+        footer_values.append(["DATA UNAVAILABLE / NEEDS MANUAL CHECK:"])
+        footer_values.extend([[f] for f in flags])
+    ws.update(footer_values, f"A{footer_row}")
+
+
+def write_central_bank(spreadsheet, data: dict, today: str):
+    ws = get_or_create_tab(spreadsheet, CENTRAL_BANK_TAB_NAME, rows=30, cols=7)
+    values = [CENTRAL_BANK_HEADER_ROW]
+    for row in data["rows"]:
+        values.append([
+            row["central_bank"],
+            row["bias"],
+            row["score"],
+            row["latest_meeting"],
+            row["next_meeting"],
+            row["forward_guidance_note"],
+            row.get("source_url", ""),
+        ])
+    ws.update(values, "A1")
+    ws.format("A1:G1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
+
+    footer_row = len(values) + 2
+    footer_values = [[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]]
+    flags = data.get("data_unavailable_flags", [])
+    if flags:
+        footer_values.append(["DATA UNAVAILABLE / NEEDS MANUAL CHECK:"])
+        footer_values.extend([[f] for f in flags])
+    ws.update(footer_values, f"A{footer_row}")
+
+
+def write_exogenous(spreadsheet, data: dict, today: str):
+    ws = get_or_create_tab(spreadsheet, EXOGENOUS_TAB_NAME, rows=30, cols=12)
+    values = [EXOGENOUS_HEADER_ROW]
+    for row in data["rows"]:
+        values.append([
+            row["pair"],
+            row["base_gdp"],
+            row["quote_gdp"],
+            row["base_current_account"],
+            row["quote_current_account"],
+            row["base_rate_direction"],
+            row["quote_rate_direction"],
+            row["base_index_level"],
+            row["base_index_12mo_high"],
+            row["total_score"],
+            row["bias"],
+            row.get("source_url", ""),
+        ])
+    ws.update(values, "A1")
+    ws.format("A1:L1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
+
+    footer_row = len(values) + 2
+    footer_values = [[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]]
+    flags = data.get("data_unavailable_flags", [])
+    if flags:
+        footer_values.append(["DATA UNAVAILABLE / NEEDS MANUAL CHECK:"])
+        footer_values.extend([[f] for f in flags])
+    ws.update(footer_values, f"A{footer_row}")
 
 def compute_rankings(all_rows: list) -> list:
     """Sum scores per currency locally in Python - far more reliable than
@@ -359,7 +580,38 @@ def main():
 
     print(f"[F4P Weekly Update] Writing rankings to '{RANKINGS_TAB_NAME}' tab...")
     write_rankings(spreadsheet, rankings)
+# --- Carry Trade ---
+    try:
+        print("[F4P Weekly Update] Building Carry Trade batch...")
+        carry_prompt = build_carry_prompt(today, CARRY_PAIRS)
+        carry_data = call_claude(carry_prompt)
+        print(f"[F4P Weekly Update] Writing Carry Trade to '{CARRY_TAB_NAME}' tab...")
+        write_carry_trade(spreadsheet, carry_data, today)
+    except Exception as exc:
+        print(f"[F4P Weekly Update] Carry Trade batch FAILED: {exc}")
+        all_flags.append(f"CARRY TRADE BATCH FAILED: {exc}")
 
+    # --- Central Bank ---
+    try:
+        print("[F4P Weekly Update] Building Central Bank batch...")
+        cb_prompt = build_central_bank_prompt(today, CENTRAL_BANKS)
+        cb_data = call_claude(cb_prompt)
+        print(f"[F4P Weekly Update] Writing Central Bank to '{CENTRAL_BANK_TAB_NAME}' tab...")
+        write_central_bank(spreadsheet, cb_data, today)
+    except Exception as exc:
+        print(f"[F4P Weekly Update] Central Bank batch FAILED: {exc}")
+        all_flags.append(f"CENTRAL BANK BATCH FAILED: {exc}")
+
+    # --- Exogenous ---
+    try:
+        print("[F4P Weekly Update] Building Exogenous batch...")
+        exo_prompt = build_exogenous_prompt(today, EXOGENOUS_PAIRS)
+        exo_data = call_claude(exo_prompt)
+        print(f"[F4P Weekly Update] Writing Exogenous to '{EXOGENOUS_TAB_NAME}' tab...")
+        write_exogenous(spreadsheet, exo_data, today)
+    except Exception as exc:
+        print(f"[F4P Weekly Update] Exogenous batch FAILED: {exc}")
+        all_flags.append(f"EXOGENOUS BATCH FAILED: {exc}")
     if all_flags:
         print(f"[F4P Weekly Update] {len(all_flags)} item(s) flagged as unavailable/failed - check sheet.")
 
