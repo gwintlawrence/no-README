@@ -470,17 +470,17 @@ def write_exogenous(spreadsheet, data: dict, today: str):
     values = [EXOGENOUS_HEADER_ROW]
     for row in data["rows"]:
         values.append([
-            row["pair"],
-            row["base_gdp"],
-            row["quote_gdp"],
-            row["base_current_account"],
-            row["quote_current_account"],
-            row["base_rate_direction"],
-            row["quote_rate_direction"],
-            row["base_index_level"],
-            row["base_index_12mo_high"],
-            row["total_score"],
-            row["bias"],
+         row.get("pair", "N/A"),
+              row.get("base_gdp", "N/A"),
+              row.get("quote_gdp", "N/A"),
+              row.get("base_current_account", "N/A"),
+              row.get("quote_current_account", "N/A"),
+              row.get("base_rate_direction", "N/A"),
+              row.get("quote_rate_direction", "N/A"),
+              row.get("base_index_level", "N/A"),
+              row.get("base_index_12mo_high", "N/A"),
+              row.get("total_score", "N/A"),
+              row.get("bias", "N/A"),
             row.get("source_url", ""),
         ])
     ws.update(values, "A1")
