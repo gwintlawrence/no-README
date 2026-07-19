@@ -469,19 +469,19 @@ def write_exogenous(spreadsheet, data: dict, today: str):
     ws = get_or_create_tab(spreadsheet, EXOGENOUS_TAB_NAME, rows=30, cols=12)
     values = [EXOGENOUS_HEADER_ROW]
     for row in data["rows"]:
-      print(f"[F4P Weekly Update] DEBUG Exogenous row keys: {list(row.keys())}")
+        print(f"[F4P Weekly Update] DEBUG Exogenous row keys: {list(row.keys())}")
         values.append([
-         row.get("pair", "N/A"),
-              row.get("base_gdp", "N/A"),
-              row.get("quote_gdp", "N/A"),
-              row.get("base_current_account", "N/A"),
-              row.get("quote_current_account", "N/A"),
-              row.get("base_rate_direction", "N/A"),
-              row.get("quote_rate_direction", "N/A"),
-              row.get("base_index_level", "N/A"),
-              row.get("base_index_12mo_high", "N/A"),
-              row.get("total_score", "N/A"),
-              row.get("bias", "N/A"),
+            row.get("pair", "N/A"),
+            row.get("base_gdp", "N/A"),
+            row.get("quote_gdp", "N/A"),
+            row.get("base_current_account", "N/A"),
+            row.get("quote_current_account", "N/A"),
+            row.get("base_rate_direction", "N/A"),
+            row.get("quote_rate_direction", "N/A"),
+            row.get("base_index_level", "N/A"),
+            row.get("base_index_12mo_high", "N/A"),
+            row.get("total_score", "N/A"),
+            row.get("bias", "N/A"),
             row.get("source_url", ""),
         ])
     ws.update(values, "A1")
