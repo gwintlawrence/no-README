@@ -289,7 +289,7 @@ Return your ENTIRE response as a single valid JSON object and NOTHING else. Do N
   "data_unavailable_flags": ["List any pairs you could not find data for, or empty list"]
 }}
 
-The rows array must contain exactly {len(pairs)} entries, one per pair listed above. You MUST write out the complete JSON object for EVERY pair in full - never use "...", "etc.", or any other abbreviation to skip or shorten repeated data, even if pairs share similar values. Each pair's full object must be written out explicitly."""
+The rows array must contain exactly {len(pairs)} entries, one per pair listed above. You MUST write out the complete JSON object for EVERY pair in full - never use "...", "etc.", or any other abbreviation to skip or shorten repeated data, even if pairs share similar values. Each pair's full object must be written out explicitly. Use EXACTLY these field names in every object: pair, base_gdp, quote_gdp, base_current_account, quote_current_account, base_rate_direction, quote_rate_direction, base_index_level, base_index_12mo_high, total_score, bias, source_url - do not add extra fields, do not rename any field, and never omit a field (use "N/A" as its value instead of leaving it out)."""
 
 def call_claude(prompt: str) -> dict:
     """
