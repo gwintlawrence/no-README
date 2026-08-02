@@ -106,6 +106,29 @@ EXOGENOUS_HEADER_ROW = [
 # (same as 4.6) on Sep 1, 2026 - worth revisiting the model string then.
 MODEL = "claude-sonnet-5"
 
+# fred_cot_fetcher.py (a separate, already-scheduled, FREE workflow - see
+# .github/workflows/fred_cot_fetcher.yml) writes real FRED figures into this
+# tab every day. It's US-series only, so this only ever helps the USD batch -
+# it has zero effect on the other 7 currencies. Mapping is deliberately
+# conservative: only indicators where the FRED series is a clean, direct
+# match for what our prompt asks for. Left out on purpose: GDP Growth Rate %
+# (FRED series is growth-rate, our "Government Debt / GDP" indicator is a
+# debt ratio - different concept) and Unemployment Rate % (no direct
+# indicator of ours asks for this specifically). "Central Bank Rate &
+# Current Policy Stance" only gets the rate NUMBER pre-filled - the
+# hawkish/dovish "stance" half of that indicator still needs real research,
+# so it isn't fully covered by this map.
+FRED_AUTO_TAB_NAME = "FRED AUTO"
+FRED_AUTO_INDICATOR_MAP = {
+    "Consumer Sentiment": "Michigan Consumer Sentiment",
+    "Building Permits / Housing": "Building Permits (000s)",
+    "CPI YoY": "CPI YoY %",
+    "Core CPI": "Core CPI YoY %",
+    "PPI": "PPI Headline YoY %",
+    "Core PPI": "Core PPI YoY %",
+    "Central Bank Rate & Current Policy Stance": "Federal Funds Rate %",
+}
+
 
 def extract_json_object(text: str) -> str:
     """
@@ -153,15 +176,65 @@ def extract_json_object(text: str) -> str:
     return text[start:]
 
 
-def build_prompt(today: str, currency_batch: list) -> str:
+def read_fred_auto_facts(spreadsheet) -> dict:
+    """
+    Reads the FRED AUTO tab - populated free, daily, by the separate
+    fred_cot_fetcher.py workflow - and returns {our_indicator_name: (value,
+    release_date, source)} for whichever of the 15 USD indicators have a
+    direct FRED equivalent (see FRED_AUTO_INDICATOR_MAP above).
+
+    This is a pure optimization: any failure here (tab missing, malformed
+    row, whatever) just means the USD batch searches for everything itself,
+    same as it always has. It must never be allowed to fail the actual run.
+    """
+    try:
+        ws = spreadsheet.worksheet(FRED_AUTO_TAB_NAME)
+        rows = ws.get_all_values()
+    except Exception as exc:
+        print(f"[F4P Weekly Update] Could not read '{FRED_AUTO_TAB_NAME}' tab ({exc}) - "
+              f"USD batch will search for all 15 indicators as normal.")
+        return {}
+
+    by_fred_label = {}
+    for row in rows:
+        if len(row) < 6:
+            continue
+        _, indicator, value, release_date, source, status = row[:6]
+        if indicator and value and status.strip().upper() == "OK":
+            by_fred_label[indicator.strip()] = (value.strip(), release_date.strip(), source.strip())
+
+    facts = {}
+    for our_name, fred_label in FRED_AUTO_INDICATOR_MAP.items():
+        if fred_label in by_fred_label:
+            facts[our_name] = by_fred_label[fred_label]
+
+    print(f"[F4P Weekly Update] FRED AUTO supplied {len(facts)}/{len(FRED_AUTO_INDICATOR_MAP)} "
+          f"pre-verified USD figures (saves searching for those specific numbers).")
+    return facts
+
+
+def build_prompt(today: str, currency_batch: list, known_facts: dict = None) -> str:
     indicator_list = "\n".join(f"  {i+1}. {name}" for i, name in enumerate(INDICATORS))
     currency_list = ", ".join(currency_batch)
+
+    known_facts_block = ""
+    if known_facts:
+        fact_lines = "\n".join(
+            f'  - {name}: current_value = "{value}" (release date {release_date}, source {source}) - '
+            f"already verified, do NOT search for this number, use it exactly as given."
+            for name, (value, release_date, source) in known_facts.items()
+        )
+        known_facts_block = f"""
+IMPORTANT - the current_value for these indicators is already verified below. Do NOT web search to re-find these specific numbers - use them exactly as given, and spend that search budget instead on finding the prior_value, forecast/consensus, and scoring context needed to score and analyze them properly:
+{fact_lines}
+"""
+
     return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) institutional Hub Data pack for the week of {today}.
 
 Use web search. Use only official primary sources: central bank websites, national statistics offices, ismworld.org, FRED (fred.stlouisfed.org), OECD, IMF. Never fabricate a number. If a number is genuinely unavailable, write "data unavailable" and score it 0.
 
 Produce the LATEST RELEASED data (as of {today}) for these currencies ONLY: {currency_list}.
-
+{known_facts_block}
 For EACH currency, give all 15 indicators in this exact order:
 {indicator_list}
 
@@ -632,12 +705,18 @@ def run_hub_data(spreadsheet, today: str) -> list:
     all_flags = []
     batch_size = 1  # 1 currency per call (15 indicators) - most reliable, avoids pause_turn loops
 
+    fred_facts = read_fred_auto_facts(spreadsheet)
+
     for batch_num, batch in enumerate(chunk(CURRENCIES, batch_size), start=1):
         print(f"[F4P Weekly Update] Batch {batch_num}: {batch}")
-        prompt = build_prompt(today, batch)
+        known_facts = fred_facts if batch == ["USD"] else None
+        prompt = build_prompt(today, batch, known_facts=known_facts)
 
         try:
-            data = call_claude(prompt, max_uses=20)
+            # USD gets a tighter search budget - up to 7 of its 15 indicators
+            # may already have a verified current_value, so it needs less
+            # searching than the other 7 currencies.
+            data = call_claude(prompt, max_uses=12 if known_facts else 20)
         except Exception as exc:
             print(f"[F4P Weekly Update] Batch {batch_num} ({batch}) FAILED: {exc}")
             print("[F4P Weekly Update] Continuing with remaining batches...")
