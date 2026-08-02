@@ -1,12 +1,23 @@
-name: F4P Weekly Hub Data Update
+    name: F4P Weekly Hub Data Update
 
 # Runs every Sunday at 6:00 AM ET (10:00 UTC, adjusts for DST automatically is NOT
 # handled by cron - 10:00 UTC = 6am EDT in summer, 5am EST in winter. Adjust below
 # if you want a fixed local time year-round.)
 on:
   schedule:
-    - cron: "0 10 * * 0"   # Sunday 10:00 UTC
-  workflow_dispatch: {}      # lets you click "Run workflow" manually in GitHub UI
+    - cron: "0 10 * * 0"   # Sunday 10:00 UTC - always runs the full pipeline (section=all)
+  workflow_dispatch:        # click "Run workflow" in the Actions tab for a manual run
+    inputs:
+      section:
+        description: "Run one section only (fast/cheap re-test) or 'all' for the full weekly pipeline"
+        type: choice
+        default: all
+        options:
+          - all
+          - hub
+          - carry
+          - central_bank
+          - exogenous
 
 jobs:
   update-hub-data:
@@ -31,8 +42,13 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
-        run: python f4p_weekly_update.py
+        # inputs.section only exists on a workflow_dispatch run; the || 'all'
+        # fallback is what keeps the plain Sunday cron trigger running the
+        # full pipeline (inputs context is empty on a schedule trigger).
+        run: python f4p_weekly_update.py --section ${{ inputs.section || 'all' }}
 
       - name: Report failure
         if: failure()
         run: echo "::error::F4P weekly update failed. Check the log above. Glenise should verify data manually this week."
+
+    
