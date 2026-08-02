@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+    #!/usr/bin/env python3
 """
 F4P Weekly Hub Data Automation
 ================================
@@ -7,6 +7,20 @@ then writes the result directly into the Google Sheet "AI HUB DATA" tab.
 
 Runs every Sunday via GitHub Actions. See .github/workflows/f4p_weekly_update.yml
 
+--section flag (new): run one section in isolation instead of the full
+pipeline. Use this to test/re-run a single tab fix without spending API
+budget on the other 10 batches:
+
+    python f4p_weekly_update.py --section exogenous
+    python f4p_weekly_update.py --section hub
+    python f4p_weekly_update.py --section carry
+    python f4p_weekly_update.py --section central_bank
+    python f4p_weekly_update.py            # same as --section all (default)
+
+The GitHub Actions workflow exposes the same choice via workflow_dispatch,
+so this can also be triggered from the Actions tab without touching a
+terminal at all.
+
 Required environment variables / GitHub Secrets:
   ANTHROPIC_API_KEY   - from console.anthropic.com
   GOOGLE_CREDENTIALS  - JSON string of your Google service account credentials
@@ -14,6 +28,7 @@ Required environment variables / GitHub Secrets:
   GOOGLE_SHEET_ID     - your F4P Google Sheet ID (already in use for FRED AUTO)
 """
 
+import argparse
 import os
 import json
 import sys
@@ -84,6 +99,12 @@ EXOGENOUS_HEADER_ROW = [
     "Quote Current Account % GDP", "Base Rate + Direction", "Quote Rate + Direction",
     "Base Index Level", "Base Index 12mo High", "Total Score", "Bias", "Source"
 ]
+
+# Model note: Sonnet 5 is running introductory pricing ($2/$10 per MTok)
+# through Aug 31, 2026, vs Sonnet 4.6's standard $3/$15 - a straight ~33%
+# cut on every batch below at equal or better quality. Reverts to $3/$15
+# (same as 4.6) on Sep 1, 2026 - worth revisiting the model string then.
+MODEL = "claude-sonnet-5"
 
 
 def extract_json_object(text: str) -> str:
@@ -175,6 +196,8 @@ Return your ENTIRE response as a single valid JSON object and NOTHING else. Do N
 
 The rows array must contain exactly {len(currency_batch) * len(INDICATORS)} entries ({len(currency_batch)} currencies x 15 indicators each). Do not include currencies other than the ones listed above. Do not include a rankings array - that will be computed separately.
 """
+
+
 def build_carry_prompt(today: str, pairs: list) -> str:
     pair_list = "\n".join(
         f"  {i+1}. Funding currency={f}, Target currency={t}" for i, (f, t) in enumerate(pairs)
@@ -211,7 +234,7 @@ Return your ENTIRE response as a single valid JSON object and NOTHING else. Do N
   "data_unavailable_flags": ["List any pairs you could not find data for, or empty list"]
 }}
 
-The rows array must contain exactly {len(pairs)} entries, one per pair listed above."""
+The rows array must contain exactly {len(pairs)} entries, one per pair listed above. You MUST write out the complete JSON object for EVERY pair in full - never use "...", "etc.", or any other abbreviation to skip or shorten repeated data. Use EXACTLY these field names in every object: funding, target, real_rate_differential, carry_score, funding_pressure, capital_flow, source_url - do not rename any field, and every row MUST include a real source_url pointing to the specific page you used for that pair's rate/CPI data. Never omit source_url or leave it blank."""
 
 
 def build_central_bank_prompt(today: str, banks: list) -> str:
@@ -257,15 +280,13 @@ Use web search. Use only official primary sources: national statistics offices, 
 
 Produce the LATEST data (as of {today}) for these pairs ONLY: {pair_list}.
 
-For EACH pair, score 4 structural drivers on a flat +/-2 scale each (total range -8 to +8):
-1. Relative GDP Growth - base country GDP% vs quote country GDP%
-2. Balance of Payments - base current account % of GDP vs quote current account % of GDP
-3. Interest Rate Differentials & Carry - base policy rate + direction (Hiking/Hold-Hawkish/Hold-Neutral/Hold-Dovish/Cutting) vs quote
-4. Stock Market Returns / Relative Wealth - base country's major index level vs its 12-month high
+For EACH pair, report the raw facts behind 4 structural drivers, and score each driver on a flat -2 to +2 scale from the BASE currency's perspective (positive = supportive of the base currency, negative = supportive of the quote currency):
+1. gdp   - Relative GDP Growth: base country GDP% vs quote country GDP%
+2. bop   - Balance of Payments: base current account % of GDP vs quote current account % of GDP
+3. rate  - Interest Rate Differential & Stance: base policy rate + direction (Hiking/Hold-Hawkish/Hold-Neutral/Hold-Dovish/Cutting) vs quote
+4. equity - Stock Market Returns / Relative Wealth: base country's major index level vs its own 12-month high
 
-For each pair provide the raw inputs plus:
-- total_score: sum of the 4 driver scores (-8 to +8)
-- bias: "Structurally Bullish" (base currency), "Mixed-Neutral", or "Structurally Bearish" (base currency)
+Do NOT compute an overall total or bias yourself - only report the 4 individual driver_scores plus the raw facts. The total and bias are computed separately from your 4 scores, so it is essential that driver_scores are accurate individually.
 
 Return your ENTIRE response as a single valid JSON object and NOTHING else. Do NOT write any introductory sentence - your response must START with {{ and END with }}.
 
@@ -281,39 +302,53 @@ Return your ENTIRE response as a single valid JSON object and NOTHING else. Do N
       "quote_rate_direction": "3.625% (Hold-Hawkish)",
       "base_index_level": "8,150",
       "base_index_12mo_high": "8,400",
-      "total_score": -2,
-      "bias": "Mixed-Neutral",
+      "driver_scores": {{"gdp": -1, "bop": 1, "rate": 0, "equity": -1}},
       "source_url": "https://..."
     }}
   ],
   "data_unavailable_flags": ["List any pairs you could not find data for, or empty list"]
 }}
 
-The rows array must contain exactly {len(pairs)} entries, one per pair listed above. You MUST write out the complete JSON object for EVERY pair in full - never use "...", "etc.", or any other abbreviation to skip or shorten repeated data, even if pairs share similar values. Each pair's full object must be written out explicitly. Use EXACTLY these field names in every object: pair, base_gdp, quote_gdp, base_current_account, quote_current_account, base_rate_direction, quote_rate_direction, base_index_level, base_index_12mo_high, total_score, bias, source_url - do not add extra fields, do not rename any field, and never omit a field (use "N/A" as its value instead of leaving it out)."""
+The rows array must contain exactly {len(pairs)} entries, one per pair listed above. You MUST write out the complete JSON object for EVERY pair in full - never use "...", "etc.", or any other abbreviation to skip or shorten repeated data, even if pairs share similar values. Each pair's full object must be written out explicitly. Use EXACTLY these field names in every object: pair, base_gdp, quote_gdp, base_current_account, quote_current_account, base_rate_direction, quote_rate_direction, base_index_level, base_index_12mo_high, driver_scores, source_url - do not add extra fields, do not rename any field, and never omit a field (use "N/A" as its value instead of leaving it out). driver_scores must always be an object with exactly these 4 keys: gdp, bop, rate, equity."""
 
-def call_claude(prompt: str) -> dict:
+
+def call_claude(prompt: str, max_uses: int = 20) -> dict:
     """
     Calls Claude with the server-side web_search tool. For large research tasks,
     Claude may return stop_reason='pause_turn' partway through - this means it is
     still actively researching and needs another turn to continue, NOT that it
     failed. We must continue the SAME conversation (resend its own content back)
     until it reaches a real stop (end_turn) with a final text answer.
+
+    max_uses is a ceiling on searches for THIS call, not a target - Claude
+    typically stops well under it. Callers pass a value sized to what that
+    section actually needs (see run_* functions below) rather than one global
+    number for every batch.
     """
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     messages = [{"role": "user", "content": prompt}]
     max_continuations = 6  # safety cap - each continuation lets it keep researching
+    total_searches = 0
 
     for attempt in range(max_continuations):
         message = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=MODEL,
             max_tokens=16000,
-            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": 40}],
+            tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}],
             messages=messages,
         )
 
+        # Real per-call telemetry - this is what should actually drive future
+        # max_uses tuning, instead of guessing. server_tool_use may be absent
+        # on SDK versions that predate this field, hence the defensive getattr.
+        server_tool_use = getattr(message.usage, "server_tool_use", None)
+        searches_this_call = getattr(server_tool_use, "web_search_requests", 0) or 0
+        total_searches += searches_this_call
+
         print(f"[F4P Weekly Update] Attempt {attempt+1}: stop_reason={message.stop_reason}, "
-              f"blocks={len(message.content)}")
+              f"blocks={len(message.content)}, searches_this_call={searches_this_call}, "
+              f"in_tokens={message.usage.input_tokens}, out_tokens={message.usage.output_tokens}")
 
         if message.stop_reason == "max_tokens":
             raise RuntimeError(
@@ -347,8 +382,16 @@ def call_claude(prompt: str) -> dict:
         json_candidate = extract_json_object(full_text)
 
         try:
-            return json.loads(json_candidate)
+            result = json.loads(json_candidate)
+            print(f"[F4P Weekly Update] Call complete - total_searches_used={total_searches} "
+                  f"(cap was {max_uses})")
+            return result
         except json.JSONDecodeError:
+            # This is the single most useful line in the whole log for diagnosing
+            # a batch that goes stale on the sheet: if this prints, call_claude()
+            # threw BEFORE the corresponding write_*() function ever ran, which
+            # means that tab's row.keys() debug print (further down) never fired
+            # this run. Check here first, not there, when a tab stops updating.
             print("[F4P Weekly Update] JSON parse failed. First 800 chars of extracted candidate:")
             print(json_candidate[:800])
             print("[F4P Weekly Update] Last 800 chars of extracted candidate:")
@@ -415,17 +458,20 @@ def write_hub_data(spreadsheet, data: dict, today: str):
         footer_values.extend([[f] for f in flags])
 
     ws.update(footer_values, f"A{footer_row}")
+
+
 def write_carry_trade(spreadsheet, data: dict, today: str):
     ws = get_or_create_tab(spreadsheet, CARRY_TAB_NAME, rows=50, cols=7)
     values = [CARRY_HEADER_ROW]
     for row in data["rows"]:
+        print(f"[F4P Weekly Update] DEBUG Carry Trade row keys: {list(row.keys())}")
         values.append([
-            row["funding"],
-            row["target"],
-            row["real_rate_differential"],
-            row["carry_score"],
-            row["funding_pressure"],
-            row["capital_flow"],
+            row.get("funding", "N/A"),
+            row.get("target", "N/A"),
+            row.get("real_rate_differential", "N/A"),
+            row.get("carry_score", "N/A"),
+            row.get("funding_pressure", "N/A"),
+            row.get("capital_flow", "N/A"),
             row.get("source_url", ""),
         ])
     ws.update(values, "A1")
@@ -465,11 +511,43 @@ def write_central_bank(spreadsheet, data: dict, today: str):
     ws.update(footer_values, f"A{footer_row}")
 
 
+def exogenous_bias_label(score: int) -> str:
+    """Thresholds are a judgment call, not derived from anything - tune freely.
+    Set at +/-3 (out of a possible +/-8) because Claude's own past self-reported
+    bias labels weren't a consistent function of its own total_score (e.g. a
+    +2 was once called 'Structurally Bullish' and a -2 'Mixed-Neutral' in the
+    same week) - computing both deterministically in Python at least guarantees
+    the label always means the same thing week to week."""
+    if score >= 3:
+        return "Structurally Bullish"
+    if score <= -3:
+        return "Structurally Bearish"
+    return "Mixed-Neutral"
+
+
 def write_exogenous(spreadsheet, data: dict, today: str):
     ws = get_or_create_tab(spreadsheet, EXOGENOUS_TAB_NAME, rows=30, cols=12)
     values = [EXOGENOUS_HEADER_ROW]
     for row in data["rows"]:
-        print(f"[F4P Weekly Update] DEBUG Exogenous row keys: {list(row.keys())}")
+        driver_scores = row.get("driver_scores", {})
+        if not isinstance(driver_scores, dict):
+            driver_scores = {}
+
+        print(f"[F4P Weekly Update] DEBUG Exogenous row keys: {list(row.keys())} | "
+              f"driver_scores keys: {list(driver_scores.keys())}")
+
+        # Sum whatever driver scores actually came back - matches compute_rankings()'s
+        # approach for AI HUB DATA: arithmetic happens here in Python, not inside
+        # Claude's response, so a missing/renamed key degrades gracefully (that
+        # driver counts as 0) instead of corrupting the whole row's total.
+        total = 0
+        for key in ("gdp", "bop", "rate", "equity"):
+            val = driver_scores.get(key, 0)
+            try:
+                total += int(val)
+            except (TypeError, ValueError):
+                pass
+
         values.append([
             row.get("pair", "N/A"),
             row.get("base_gdp", "N/A"),
@@ -480,8 +558,8 @@ def write_exogenous(spreadsheet, data: dict, today: str):
             row.get("quote_rate_direction", "N/A"),
             row.get("base_index_level", "N/A"),
             row.get("base_index_12mo_high", "N/A"),
-            row.get("total_score", "N/A"),
-            row.get("bias", "N/A"),
+            total,
+            exogenous_bias_label(total),
             row.get("source_url", ""),
         ])
     ws.update(values, "A1")
@@ -494,6 +572,7 @@ def write_exogenous(spreadsheet, data: dict, today: str):
         footer_values.append(["DATA UNAVAILABLE / NEEDS MANUAL CHECK:"])
         footer_values.extend([[f] for f in flags])
     ws.update(footer_values, f"A{footer_row}")
+
 
 def compute_rankings(all_rows: list) -> list:
     """Sum scores per currency locally in Python - far more reliable than
@@ -537,10 +616,18 @@ def chunk(lst, size):
         yield lst[i:i + size]
 
 
-def main():
-    today = datetime.now(timezone.utc).strftime("%B %d, %Y")
-    print(f"[F4P Weekly Update] Starting run for {today}")
+# ══════════════════════════════════════════════════════════════════════════
+# SECTION RUNNERS - each is independently callable via --section, and each
+# is now individually try/excepted by main() below. A total failure in one
+# section (e.g. zero rows collected) can no longer take the other three
+# sections down with it, which the previous single-main()-body version did:
+# the old code's `raise RuntimeError(...)` on zero hub-data rows was outside
+# any try/except, so a bad hub-data week meant Carry/Central Bank/Exogenous
+# silently never ran either, with nothing in the log to say why.
+# ══════════════════════════════════════════════════════════════════════════
 
+def run_hub_data(spreadsheet, today: str) -> list:
+    """AI HUB DATA + AI RANKINGS - 8 currency batches, 1 API call each."""
     all_rows = []
     all_flags = []
     batch_size = 1  # 1 currency per call (15 indicators) - most reliable, avoids pause_turn loops
@@ -550,7 +637,7 @@ def main():
         prompt = build_prompt(today, batch)
 
         try:
-            data = call_claude(prompt)
+            data = call_claude(prompt, max_uses=20)
         except Exception as exc:
             print(f"[F4P Weekly Update] Batch {batch_num} ({batch}) FAILED: {exc}")
             print("[F4P Weekly Update] Continuing with remaining batches...")
@@ -566,60 +653,93 @@ def main():
         all_flags.extend(data.get("data_unavailable_flags", []))
 
     if not all_rows:
-        raise RuntimeError("All batches failed - no data collected at all. Aborting before writing to sheet.")
+        raise RuntimeError("All currency batches failed - no data collected at all. Not writing to sheet.")
 
     print(f"[F4P Weekly Update] Collected {len(all_rows)} total rows across all batches.")
 
     rankings = compute_rankings(all_rows)
     full_data = {"data_cutoff": f"Week of {today}", "rows": all_rows, "data_unavailable_flags": all_flags}
 
-    print("[F4P Weekly Update] Connecting to Google Sheet...")
-    spreadsheet = connect_sheet()
-
     print(f"[F4P Weekly Update] Writing {len(all_rows)} rows to '{SHEET_TAB_NAME}' tab...")
     write_hub_data(spreadsheet, full_data, today)
 
     print(f"[F4P Weekly Update] Writing rankings to '{RANKINGS_TAB_NAME}' tab...")
     write_rankings(spreadsheet, rankings)
-# --- Carry Trade ---
-    try:
-        print("[F4P Weekly Update] Building Carry Trade batch...")
-        carry_prompt = build_carry_prompt(today, CARRY_PAIRS)
-        carry_data = call_claude(carry_prompt)
-        print(f"[F4P Weekly Update] Writing Carry Trade to '{CARRY_TAB_NAME}' tab...")
-        write_carry_trade(spreadsheet, carry_data, today)
-    except Exception as exc:
-        print(f"[F4P Weekly Update] Carry Trade batch FAILED: {exc}")
-        all_flags.append(f"CARRY TRADE BATCH FAILED: {exc}")
-
-    # --- Central Bank ---
-    try:
-        print("[F4P Weekly Update] Building Central Bank batch...")
-        cb_prompt = build_central_bank_prompt(today, CENTRAL_BANKS)
-        cb_data = call_claude(cb_prompt)
-        print(f"[F4P Weekly Update] Writing Central Bank to '{CENTRAL_BANK_TAB_NAME}' tab...")
-        write_central_bank(spreadsheet, cb_data, today)
-    except Exception as exc:
-        print(f"[F4P Weekly Update] Central Bank batch FAILED: {exc}")
-        all_flags.append(f"CENTRAL BANK BATCH FAILED: {exc}")
-
-    # --- Exogenous ---
-    try:
-        print("[F4P Weekly Update] Building Exogenous batch...")
-        exo_prompt = build_exogenous_prompt(today, EXOGENOUS_PAIRS)
-        exo_data = call_claude(exo_prompt)
-        print(f"[F4P Weekly Update] Writing Exogenous to '{EXOGENOUS_TAB_NAME}' tab...")
-        write_exogenous(spreadsheet, exo_data, today)
-    except Exception as exc:
-        print(f"[F4P Weekly Update] Exogenous batch FAILED: {exc}")
-        all_flags.append(f"EXOGENOUS BATCH FAILED: {exc}")
-    if all_flags:
-        print(f"[F4P Weekly Update] {len(all_flags)} item(s) flagged as unavailable/failed - check sheet.")
 
     expected_total = len(CURRENCIES) * len(INDICATORS)
     if len(all_rows) < expected_total:
         print(f"[F4P Weekly Update] WARNING: only {len(all_rows)}/{expected_total} rows collected. "
               f"Glenise should verify missing currencies manually this week.")
+
+    return all_flags
+
+
+def run_carry_trade(spreadsheet, today: str) -> list:
+    print("[F4P Weekly Update] Building Carry Trade batch...")
+    carry_prompt = build_carry_prompt(today, CARRY_PAIRS)
+    carry_data = call_claude(carry_prompt, max_uses=20)
+    print(f"[F4P Weekly Update] Writing Carry Trade to '{CARRY_TAB_NAME}' tab...")
+    write_carry_trade(spreadsheet, carry_data, today)
+    return carry_data.get("data_unavailable_flags", [])
+
+
+def run_central_bank(spreadsheet, today: str) -> list:
+    print("[F4P Weekly Update] Building Central Bank batch...")
+    cb_prompt = build_central_bank_prompt(today, CENTRAL_BANKS)
+    cb_data = call_claude(cb_prompt, max_uses=15)
+    print(f"[F4P Weekly Update] Writing Central Bank to '{CENTRAL_BANK_TAB_NAME}' tab...")
+    write_central_bank(spreadsheet, cb_data, today)
+    return cb_data.get("data_unavailable_flags", [])
+
+
+def run_exogenous(spreadsheet, today: str) -> list:
+    print("[F4P Weekly Update] Building Exogenous batch...")
+    exo_prompt = build_exogenous_prompt(today, EXOGENOUS_PAIRS)
+    exo_data = call_claude(exo_prompt, max_uses=30)  # heaviest/most fact-dense batch - see Phase 2 note
+    print(f"[F4P Weekly Update] Writing Exogenous to '{EXOGENOUS_TAB_NAME}' tab...")
+    write_exogenous(spreadsheet, exo_data, today)
+    return exo_data.get("data_unavailable_flags", [])
+
+
+SECTIONS = {
+    "hub": run_hub_data,
+    "carry": run_carry_trade,
+    "central_bank": run_central_bank,
+    "exogenous": run_exogenous,
+}
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="F4P weekly update - run the full pipeline, or one section in isolation."
+    )
+    parser.add_argument(
+        "--section",
+        choices=["all", *SECTIONS.keys()],
+        default="all",
+        help="Run only this section instead of the full 11-batch pipeline. Default: all.",
+    )
+    args = parser.parse_args()
+
+    today = datetime.now(timezone.utc).strftime("%B %d, %Y")
+    print(f"[F4P Weekly Update] Starting run for {today} (section={args.section})")
+
+    print("[F4P Weekly Update] Connecting to Google Sheet...")
+    spreadsheet = connect_sheet()
+
+    all_flags = []
+    names = list(SECTIONS.keys()) if args.section == "all" else [args.section]
+
+    for name in names:
+        try:
+            flags = SECTIONS[name](spreadsheet, today)
+            all_flags.extend(flags or [])
+        except Exception as exc:
+            print(f"[F4P Weekly Update] Section '{name}' FAILED: {exc}")
+            all_flags.append(f"{name.upper()} SECTION FAILED: {exc}")
+
+    if all_flags:
+        print(f"[F4P Weekly Update] {len(all_flags)} item(s) flagged as unavailable/failed - check sheet.")
 
     print("[F4P Weekly Update] Done.")
 
@@ -630,3 +750,5 @@ if __name__ == "__main__":
     except Exception as exc:
         print(f"[F4P Weekly Update] FAILED: {exc}", file=sys.stderr)
         sys.exit(1)
+
+    
