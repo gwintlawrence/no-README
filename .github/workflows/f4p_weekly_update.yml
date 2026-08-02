@@ -1,4 +1,4 @@
-    name: F4P Weekly Hub Data Update
+name: F4P Weekly Hub Data Update
 
 # Runs every Sunday at 6:00 AM ET (10:00 UTC, adjusts for DST automatically is NOT
 # handled by cron - 10:00 UTC = 6am EDT in summer, 5am EST in winter. Adjust below
