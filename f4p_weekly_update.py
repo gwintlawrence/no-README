@@ -405,16 +405,24 @@ def call_claude(prompt: str, max_uses: int = 20) -> dict:
     total_searches = 0
 
     for attempt in range(max_continuations):
-        message = client.messages.create(
+        # Streaming is required here, not create(): the Anthropic SDK refuses
+        # a plain (non-streaming) request above roughly 21,333 max_tokens and
+        # raises "Streaming is required for operations that may take longer
+        # than 10 minutes" - hit exactly this the run right after raising
+        # max_tokens to 24000. .stream() + get_final_message() returns the
+        # same Message object shape create() does (same .content, .usage,
+        # .stop_reason), so nothing below this line needs to change.
+        with client.messages.stream(
             model=MODEL,
-            # Raised from 16000 - the USD batch hit this ceiling on Aug 2's run
-            # (out_tokens=17101, stop_reason=max_tokens) even with fewer searches
-            # than usual, so 16000 wasn't enough headroom for a 15-indicator
-            # response with full institutional-analysis sentences.
+            # Raised from 16000 - the USD batch hit this ceiling on an
+            # earlier run (out_tokens=17101, stop_reason=max_tokens) even
+            # with fewer searches than usual, so 16000 wasn't enough
+            # headroom for a 15-indicator response.
             max_tokens=24000,
             tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}],
             messages=messages,
-        )
+        ) as stream:
+            message = stream.get_final_message()
 
         # Real per-call telemetry - this is what should actually drive future
         # max_uses tuning, instead of guessing. server_tool_use may be absent
