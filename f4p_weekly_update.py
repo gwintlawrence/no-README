@@ -407,7 +407,11 @@ def call_claude(prompt: str, max_uses: int = 20) -> dict:
     for attempt in range(max_continuations):
         message = client.messages.create(
             model=MODEL,
-            max_tokens=16000,
+            # Raised from 16000 - the USD batch hit this ceiling on Aug 2's run
+            # (out_tokens=17101, stop_reason=max_tokens) even with fewer searches
+            # than usual, so 16000 wasn't enough headroom for a 15-indicator
+            # response with full institutional-analysis sentences.
+            max_tokens=24000,
             tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}],
             messages=messages,
         )
