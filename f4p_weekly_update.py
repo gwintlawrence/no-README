@@ -79,8 +79,6 @@ CARRY_PAIRS = [
 
 CENTRAL_BANKS = ["FED", "ECB", "BOE", "BOJ", "SNB", "RBA", "RBNZ", "BOC"]
 
-EXOGENOUS_PAIRS = ["GBPUSD", "EURUSD", "AUDUSD", "USDJPY", "USDCAD", "NZDUSD", "USDCHF"]
-
 CARRY_TAB_NAME = "CARRY TRADE"
 CARRY_HEADER_ROW = [
     "Funding", "Target", "Real Rate Differential", "Carry Score",
@@ -93,11 +91,23 @@ CENTRAL_BANK_HEADER_ROW = [
     "Next Meeting", "Forward Guidance Note", "Source"
 ]
 
+# EXOGENOUS restructured from per-PAIR (7 rows, one per tracked pair) to
+# per-CURRENCY (8 rows, reusing the same CURRENCIES list as Hub Data).
+# Rationale: the old layout stored each pair's "base" currency index/GDP/etc
+# only for whichever side the Sheet happened to call base - so USD (base in
+# 3 of 7 pairs, quote in the other 4) had its facts researched up to 3x
+# redundantly, while JPY/CAD/CHF (never "base" in any tracked pair) had NO
+# index data anywhere, for any pair, ever. Per-currency, every currency gets
+# researched exactly once, has a complete symmetric fact set, and any pair -
+# not just the 7 previously hardcoded - can be diffed client-side from two
+# currency rows. Pair-level scoring (the old Total Score/Bias columns) moves
+# out of the Sheet entirely - that arithmetic now happens in whichever tool
+# displays a pair (the Bias Tool and standalone Exogenous tool already do
+# this client-side via their own scoreD1-4 functions), not here.
 EXOGENOUS_TAB_NAME = "EXOGENOUS"
 EXOGENOUS_HEADER_ROW = [
-    "Pair", "Base GDP %", "Quote GDP %", "Base Current Account % GDP",
-    "Quote Current Account % GDP", "Base Rate + Direction", "Quote Rate + Direction",
-    "Base Index Level", "Base Index 12mo High", "Total Score", "Bias", "Source"
+    "Currency", "GDP %", "Current Account % GDP", "Policy Rate %",
+    "Rate Direction", "Stock Index Level", "Stock Index 12mo High", "Source"
 ]
 
 # Model note: Sonnet 5 is running introductory pricing ($2/$10 per MTok)
@@ -345,44 +355,40 @@ Return your ENTIRE response as a single valid JSON object and NOTHING else. Do N
 The rows array must contain exactly {len(banks)} entries, one per central bank listed above."""
 
 
-def build_exogenous_prompt(today: str, pairs: list) -> str:
-    pair_list = ", ".join(pairs)
-    return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) Exogenous Drivers Data pack for the week of {today}, matching the structure of the F4P Exogenous Drivers tool.
+def build_exogenous_prompt(today: str, currencies: list) -> str:
+    currency_list = ", ".join(currencies)
+    return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) Exogenous Drivers Data pack for the week of {today}.
 
 Use web search. Use only official primary sources: national statistics offices, central banks, stock exchange data, FRED, OECD, IMF. Never fabricate a number.
 
-Produce the LATEST data (as of {today}) for these pairs ONLY: {pair_list}.
+Produce the LATEST data (as of {today}) for these currencies ONLY: {currency_list}.
 
-For EACH pair, report the raw facts behind 4 structural drivers, and score each driver on a flat -2 to +2 scale from the BASE currency's perspective (positive = supportive of the base currency, negative = supportive of the quote currency):
-1. gdp   - Relative GDP Growth: base country GDP% vs quote country GDP%
-2. bop   - Balance of Payments: base current account % of GDP vs quote current account % of GDP
-3. rate  - Interest Rate Differential & Stance: base policy rate + direction (Hiking/Hold-Hawkish/Hold-Neutral/Hold-Dovish/Cutting) vs quote
-4. equity - Stock Market Returns / Relative Wealth: base country's major index level vs its own 12-month high
+For EACH currency, report these 4 structural facts:
+1. GDP % - latest GDP growth rate (YoY or QoQ annualized, whichever is the standard headline figure for that country)
+2. Current Account % of GDP - latest current account balance as a percentage of GDP
+3. Policy Rate % and Direction - the central bank's current policy rate, and its stance: one of Hiking, Hold-Hawkish, Hold-Neutral, Hold-Dovish, or Cutting
+4. Stock Index - that country's major equity index (e.g. S&P 500 for USD, FTSE 100 for GBP, DAX for EUR, Nikkei 225 for JPY, ASX 200 for AUD, TSX for CAD, NZX 50 for NZD, SMI for CHF): current level AND its 12-month high
 
-Do NOT compute an overall total or bias yourself - only report the 4 individual driver_scores plus the raw facts. The total and bias are computed separately from your 4 scores, so it is essential that driver_scores are accurate individually.
+These are raw facts only - do not score or compute anything. Any pair-level comparison or bias happens downstream from these per-currency facts, not here.
 
 Return your ENTIRE response as a single valid JSON object and NOTHING else. Do NOT write any introductory sentence - your response must START with {{ and END with }}.
 
 {{
   "rows": [
     {{
-      "pair": "GBPUSD",
-      "base_gdp": "1.2%",
-      "quote_gdp": "2.1%",
-      "base_current_account": "-2.5%",
-      "quote_current_account": "-3.1%",
-      "base_rate_direction": "3.75% (Hold-Hawkish)",
-      "quote_rate_direction": "3.625% (Hold-Hawkish)",
-      "base_index_level": "8,150",
-      "base_index_12mo_high": "8,400",
-      "driver_scores": {{"gdp": -1, "bop": 1, "rate": 0, "equity": -1}},
+      "currency": "USD",
+      "gdp": "2.4%",
+      "current_account": "-3.1%",
+      "policy_rate": "3.50-3.75% (Hold-Hawkish)",
+      "index_level": "6,280",
+      "index_12mo_high": "6,450",
       "source_url": "https://..."
     }}
   ],
-  "data_unavailable_flags": ["List any pairs you could not find data for, or empty list"]
+  "data_unavailable_flags": ["List any currencies you could not find data for, or empty list"]
 }}
 
-The rows array must contain exactly {len(pairs)} entries, one per pair listed above. You MUST write out the complete JSON object for EVERY pair in full - never use "...", "etc.", or any other abbreviation to skip or shorten repeated data, even if pairs share similar values. Each pair's full object must be written out explicitly. Use EXACTLY these field names in every object: pair, base_gdp, quote_gdp, base_current_account, quote_current_account, base_rate_direction, quote_rate_direction, base_index_level, base_index_12mo_high, driver_scores, source_url - do not add extra fields, do not rename any field, and never omit a field (use "N/A" as its value instead of leaving it out). driver_scores must always be an object with exactly these 4 keys: gdp, bop, rate, equity."""
+The rows array must contain exactly {len(currencies)} entries, one per currency listed above. You MUST write out the complete JSON object for EVERY currency in full - never use "...", "etc.", or any other abbreviation to skip or shorten repeated data. Use EXACTLY these field names in every object: currency, gdp, current_account, policy_rate, index_level, index_12mo_high, source_url - do not add extra fields, do not rename any field, and never omit a field (use "N/A" as its value instead of leaving it out)."""
 
 
 def call_claude(prompt: str, max_uses: int = 20) -> dict:
@@ -596,59 +602,22 @@ def write_central_bank(spreadsheet, data: dict, today: str):
     ws.update(footer_values, f"A{footer_row}")
 
 
-def exogenous_bias_label(score: int) -> str:
-    """Thresholds are a judgment call, not derived from anything - tune freely.
-    Set at +/-3 (out of a possible +/-8) because Claude's own past self-reported
-    bias labels weren't a consistent function of its own total_score (e.g. a
-    +2 was once called 'Structurally Bullish' and a -2 'Mixed-Neutral' in the
-    same week) - computing both deterministically in Python at least guarantees
-    the label always means the same thing week to week."""
-    if score >= 3:
-        return "Structurally Bullish"
-    if score <= -3:
-        return "Structurally Bearish"
-    return "Mixed-Neutral"
-
-
 def write_exogenous(spreadsheet, data: dict, today: str):
-    ws = get_or_create_tab(spreadsheet, EXOGENOUS_TAB_NAME, rows=30, cols=12)
+    ws = get_or_create_tab(spreadsheet, EXOGENOUS_TAB_NAME, rows=15, cols=8)
     values = [EXOGENOUS_HEADER_ROW]
     for row in data["rows"]:
-        driver_scores = row.get("driver_scores", {})
-        if not isinstance(driver_scores, dict):
-            driver_scores = {}
-
-        print(f"[F4P Weekly Update] DEBUG Exogenous row keys: {list(row.keys())} | "
-              f"driver_scores keys: {list(driver_scores.keys())}")
-
-        # Sum whatever driver scores actually came back - matches compute_rankings()'s
-        # approach for AI HUB DATA: arithmetic happens here in Python, not inside
-        # Claude's response, so a missing/renamed key degrades gracefully (that
-        # driver counts as 0) instead of corrupting the whole row's total.
-        total = 0
-        for key in ("gdp", "bop", "rate", "equity"):
-            val = driver_scores.get(key, 0)
-            try:
-                total += int(val)
-            except (TypeError, ValueError):
-                pass
-
+        print(f"[F4P Weekly Update] DEBUG Exogenous row keys: {list(row.keys())}")
         values.append([
-            row.get("pair", "N/A"),
-            row.get("base_gdp", "N/A"),
-            row.get("quote_gdp", "N/A"),
-            row.get("base_current_account", "N/A"),
-            row.get("quote_current_account", "N/A"),
-            row.get("base_rate_direction", "N/A"),
-            row.get("quote_rate_direction", "N/A"),
-            row.get("base_index_level", "N/A"),
-            row.get("base_index_12mo_high", "N/A"),
-            total,
-            exogenous_bias_label(total),
+            row.get("currency", "N/A"),
+            row.get("gdp", "N/A"),
+            row.get("current_account", "N/A"),
+            row.get("policy_rate", "N/A"),
+            row.get("index_level", "N/A"),
+            row.get("index_12mo_high", "N/A"),
             row.get("source_url", ""),
         ])
     ws.update(values, "A1")
-    ws.format("A1:L1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
+    ws.format("A1:H1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
 
     footer_row = len(values) + 2
     footer_values = [[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]]
@@ -784,9 +753,9 @@ def run_central_bank(spreadsheet, today: str) -> list:
 
 
 def run_exogenous(spreadsheet, today: str) -> list:
-    print("[F4P Weekly Update] Building Exogenous batch...")
-    exo_prompt = build_exogenous_prompt(today, EXOGENOUS_PAIRS)
-    exo_data = call_claude(exo_prompt, max_uses=30)  # heaviest/most fact-dense batch - see Phase 2 note
+    print("[F4P Weekly Update] Building Exogenous batch (per-currency)...")
+    exo_prompt = build_exogenous_prompt(today, CURRENCIES)
+    exo_data = call_claude(exo_prompt, max_uses=20)  # was 30 - per-currency is genuinely less work, not just reorganized
     print(f"[F4P Weekly Update] Writing Exogenous to '{EXOGENOUS_TAB_NAME}' tab...")
     write_exogenous(spreadsheet, exo_data, today)
     return exo_data.get("data_unavailable_flags", [])
