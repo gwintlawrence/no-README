@@ -107,7 +107,7 @@ CENTRAL_BANK_HEADER_ROW = [
 EXOGENOUS_TAB_NAME = "EXOGENOUS"
 EXOGENOUS_HEADER_ROW = [
     "Currency", "GDP %", "Current Account % GDP", "Policy Rate %",
-    "Rate Direction", "Stock Index Level", "Stock Index 12mo High", "Source"
+    "Stock Index Level", "Stock Index 12mo High", "Source"
 ]
 
 # Model note: Sonnet 5 is running introductory pricing ($2/$10 per MTok)
@@ -603,7 +603,7 @@ def write_central_bank(spreadsheet, data: dict, today: str):
 
 
 def write_exogenous(spreadsheet, data: dict, today: str):
-    ws = get_or_create_tab(spreadsheet, EXOGENOUS_TAB_NAME, rows=15, cols=8)
+    ws = get_or_create_tab(spreadsheet, EXOGENOUS_TAB_NAME, rows=15, cols=7)
     values = [EXOGENOUS_HEADER_ROW]
     for row in data["rows"]:
         print(f"[F4P Weekly Update] DEBUG Exogenous row keys: {list(row.keys())}")
@@ -617,7 +617,7 @@ def write_exogenous(spreadsheet, data: dict, today: str):
             row.get("source_url", ""),
         ])
     ws.update(values, "A1")
-    ws.format("A1:H1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
+    ws.format("A1:G1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
 
     footer_row = len(values) + 2
     footer_values = [[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]]
