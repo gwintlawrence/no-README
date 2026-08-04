@@ -110,20 +110,30 @@ def get_cot_data():
         # This tells us exactly why on the next run instead of guessing again.
         print('[COT DEBUG] Parsed file: ' + csv_name)
         print('[COT DEBUG] Total rows parsed: ' + str(len(rows)))
+        # Confirmed via live debug output (2026-08-04): this is genuinely
+        # the Traders in Financial Futures (TFF) report, which categorizes
+        # by Dealer / Asset Manager / Leveraged Funds / Other Reportables -
+        # NOT the Legacy report's NonComm/Comm split this code was
+        # originally written against. The correct field for what this
+        # system actually wants (matching the Terminal tool's own
+        # methodology note: "COT data source upgraded to official CFTC
+        # Leveraged Funds figures") is Lev_Money_Positions_*, not
+        # NonComm_Positions_*. Also fixed: CFTC_Contract_Market_Code has an
+        # underscore before "Code" that the original field name was missing.
         if rows:
             print('[COT DEBUG] Actual column names: ' + str(list(rows[0].keys())))
-            sample_codes = [r.get('CFTC_Contract_MarketCode', '<column not found>') for r in rows[:5]]
-            print('[COT DEBUG] First 5 CFTC_Contract_MarketCode values: ' + str(sample_codes))
+            sample_codes = [r.get('CFTC_Contract_Market_Code', '<column not found>') for r in rows[:5]]
+            print('[COT DEBUG] First 5 CFTC_Contract_Market_Code values: ' + str(sample_codes))
 
         results = {}
         for ccy, code in COT_CODES.items():
-            matching = [r for r in rows if code in r.get('CFTC_Contract_MarketCode', '')]
+            matching = [r for r in rows if code in r.get('CFTC_Contract_Market_Code', '')]
             matching_sorted = sorted(matching, key=lambda r: r.get('As_of_Date_In_Form_YYMMDD', ''), reverse=True)
             if matching_sorted:
                 row = matching_sorted[0]
                 try:
-                    long_pos = int(row.get('NonComm_Positions_Long_All', 0))
-                    short_pos = int(row.get('NonComm_Positions_Short_All', 0))
+                    long_pos = int(row.get('Lev_Money_Positions_Long_All', 0))
+                    short_pos = int(row.get('Lev_Money_Positions_Short_All', 0))
                     net = long_pos - short_pos
                     results[ccy] = {'net': net, 'long': long_pos, 'short': short_pos, 'date': row.get('As_of_Date_In_Form_YYMMDD', '')}
                 except (ValueError, KeyError):
