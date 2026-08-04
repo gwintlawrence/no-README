@@ -90,7 +90,12 @@ def get_cot_data():
             data_files = zf.namelist()
         csv_name = data_files[0]
         raw = zf.read(csv_name).decode('utf-8', errors='replace')
-        reader = csv.DictReader(io.StringIO(raw))
+        # newline='' matters here: without it, StringIO's default newline
+        # translation can conflict with how the csv module expects to see
+        # embedded \r\n sequences inside quoted multi-line fields, producing
+        # exactly the "new-line character seen in unquoted field" error hit
+        # on the first real test of this fetch.
+        reader = csv.DictReader(io.StringIO(raw, newline=''))
         rows = list(reader)
         results = {}
         for ccy, code in COT_CODES.items():
