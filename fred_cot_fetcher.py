@@ -1,4 +1,4 @@
-import os
+    import os
 import json
 import requests
 import time
@@ -78,7 +78,16 @@ def get_cot_data():
         resp = requests.get(url, timeout=60)
         resp.raise_for_status()
         zf = zipfile.ZipFile(io.BytesIO(resp.content))
-        csv_name = [n for n in zf.namelist() if n.lower().endswith('.csv')][0]
+        # Was: [n for n in zf.namelist() if n.lower().endswith('.csv')][0]
+        # That raised "list index out of range" every Friday - CFTC's zip
+        # apparently no longer contains a file ending in exactly '.csv'.
+        # These bulk files always contain exactly one data file regardless
+        # of its extension, so check both known extensions and fall back to
+        # "whatever's actually in there" rather than assuming one name.
+        data_files = [n for n in zf.namelist() if n.lower().endswith(('.csv', '.txt'))]
+        if not data_files:
+            data_files = zf.namelist()
+        csv_name = data_files[0]
         raw = zf.read(csv_name).decode('utf-8', errors='replace')
         reader = csv.DictReader(io.StringIO(raw))
         rows = list(reader)
@@ -240,3 +249,5 @@ def main():
 
 
 main()
+
+    
