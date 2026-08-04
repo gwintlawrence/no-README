@@ -97,6 +97,17 @@ def get_cot_data():
         # on the first real test of this fetch.
         reader = csv.DictReader(io.StringIO(raw, newline=''))
         rows = list(reader)
+
+        # DIAGNOSTIC - every currency came back N/A on the first clean parse,
+        # meaning the download+parse worked but COT_CODES matched nothing.
+        # This tells us exactly why on the next run instead of guessing again.
+        print('[COT DEBUG] Parsed file: ' + csv_name)
+        print('[COT DEBUG] Total rows parsed: ' + str(len(rows)))
+        if rows:
+            print('[COT DEBUG] Actual column names: ' + str(list(rows[0].keys())))
+            sample_codes = [r.get('CFTC_Contract_MarketCode', '<column not found>') for r in rows[:5]]
+            print('[COT DEBUG] First 5 CFTC_Contract_MarketCode values: ' + str(sample_codes))
+
         results = {}
         for ccy, code in COT_CODES.items():
             matching = [r for r in rows if code in r.get('CFTC_Contract_MarketCode', '')]
