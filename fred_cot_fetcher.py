@@ -74,7 +74,14 @@ def get_fred_value(series_id, calculation):
 
 def get_cot_data():
     year = datetime.datetime.now().year
-    url = 'https://www.cftc.gov/files/dea/history/fut_fin_xls_' + str(year) + '.zip'
+    # Was 'fut_fin_xls_' - confirmed via live debug output (2026-08-04) that
+    # this URL genuinely returns a binary Excel (.xls) file, not CSV/text -
+    # that's why parsing produced 30,470 garbled rows instead of a real
+    # error: csv.DictReader was splitting binary bytes on stray commas,
+    # not real structure. CFTC offers the identical report as plain
+    # delimited text at this URL instead - that's the one this script
+    # actually needs.
+    url = 'https://www.cftc.gov/files/dea/history/fut_fin_txt_' + str(year) + '.zip'
     try:
         resp = requests.get(url, timeout=60)
         resp.raise_for_status()
