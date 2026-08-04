@@ -1,4 +1,4 @@
-# ════════════════════════════════════════════════════════════════
+    # ════════════════════════════════════════════════════════════════
 # F4P MACRO DATA FETCHER — GITHUB ACTIONS WORKFLOW
 # GWL Trading Team · Fishin4Pips System
 #
@@ -26,6 +26,11 @@ on:
     - cron: '0 21 * * 5'
   # Allow manual trigger from GitHub Actions tab
   workflow_dispatch:
+    inputs:
+      force_cot:
+        description: "Force the COT fetch to run now, regardless of day (testing aid - normal scheduled runs don't need this)"
+        type: boolean
+        default: false
 
 jobs:
   fetch-macro-data:
@@ -50,10 +55,12 @@ jobs:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         run: |
-          python fred_cot_fetcher.py
+          python fred_cot_fetcher.py ${{ inputs.force_cot && '--force-cot' || '' }}
 
       - name: Confirm completion
         run: |
           echo "F4P data fetch complete — $(date -u)"
           echo "Check FRED AUTO tab in Google Sheet:"
           echo "https://docs.google.com/spreadsheets/d/1fhYqdylvYWzU0cdiM2qrkMbv-UeOkWfM"
+
+    
