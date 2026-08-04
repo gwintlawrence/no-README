@@ -1,4 +1,4 @@
-import os
+    import os
 import json
 import requests
 import time
@@ -6,6 +6,7 @@ import datetime
 import io
 import csv
 import zipfile
+import argparse
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 
@@ -220,9 +221,19 @@ def write_to_sheet(service, fred_results, cot_results, is_friday):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="F4P free macro + COT data fetcher.")
+    parser.add_argument(
+        "--force-cot", action="store_true",
+        help="Attempt the COT fetch regardless of what day it is - lets you test a COT-related "
+             "fix immediately instead of waiting for a real Friday. Normal scheduled runs never "
+             "need this; it's a manual testing aid only.",
+    )
+    args = parser.parse_args()
+
     run_time = datetime.datetime.utcnow()
-    is_friday = run_time.weekday() == 4
-    print('F4P Data Fetcher starting: ' + run_time.strftime('%Y-%m-%d %H:%M UTC'))
+    is_friday = run_time.weekday() == 4 or args.force_cot
+    print('F4P Data Fetcher starting: ' + run_time.strftime('%Y-%m-%d %H:%M UTC')
+          + (' (COT forced on)' if args.force_cot and run_time.weekday() != 4 else ''))
 
     fred_results = {}
     for series_id, calc, label, _ in FRED_SERIES:
