@@ -9,6 +9,7 @@ import zipfile
 import argparse
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 FRED_API_KEY      = os.environ['FRED_API_KEY']
 GOOGLE_CREDS_JSON = os.environ['GOOGLE_CREDENTIALS']
@@ -287,11 +288,35 @@ def main():
 
     print('Writing to Google Sheet...')
     service = get_sheets_service()
-    ensure_tab_exists(service)
-    write_to_sheet(service, fred_results, cot_results, is_friday)
+
+    # Google's Sheets API occasionally returns transient 5xx/429 errors that
+    # have nothing to do with our data, auth, or permissions - just a brief
+    # hiccup on Google's end (confirmed live: run #99 died on a clean 503
+    # from spreadsheets().get() even though every FRED value had already
+    # fetched fine). Retry with backoff instead of letting one blip fail
+    # the whole day's write.
+    max_attempts = 4
+    for attempt in range(1, max_attempts + 1):
+        try:
+            ensure_tab_exists(service)
+            write_to_sheet(service, fred_results, cot_results, is_friday)
+            break
+        except HttpError as e:
+            status = getattr(e.resp, 'status', None)
+            retryable = status in (429, 500, 502, 503, 504)
+            if retryable and attempt < max_attempts:
+                wait = 10 * attempt
+                print('  -> Sheets API error (' + str(status) + '), retrying in '
+                      + str(wait) + 's (attempt ' + str(attempt) + '/' + str(max_attempts) + ')...')
+                time.sleep(wait)
+                continue
+            raise
+
     print('Done. Check FRED AUTO tab in your Sheet.')
 
 
 main()
+
+    
 
     
