@@ -197,15 +197,21 @@ def write_to_sheet(service, fred_results, cot_results, is_friday):
         body={'values': rows}
     ).execute()
 
-    # COT section header
-    today = datetime.datetime.utcnow().strftime('%Y-%m-%d')
+    # COT section header - only touches columns A/B here. Column C ("Last
+    # COT fetch: <date>") used to get stamped with today's date on every
+    # single run, Mon-Fri, regardless of whether COT was actually fetched -
+    # so a Monday run could make 6-day-stale COT data (last real fetch was
+    # Friday) look same-day-fresh. That's a Cardinal Rule risk: COT must
+    # confirm before a trade, and a mislabeled date could pass as
+    # confirmation when it isn't. Fix: the date only gets written further
+    # down, and only on the code path where a fetch actually just succeeded.
     service.spreadsheets().values().update(
         spreadsheetId=SPREADSHEET_ID,
-        range=TAB_NAME + '!A15:F16',
+        range=TAB_NAME + '!A15:B16',
         valueInputOption='RAW',
         body={'values': [
             [''],
-            ['COT POSITIONING (CFTC - Updated Fridays)', '', 'Last COT fetch: ' + today, '', '', '']
+            ['COT POSITIONING (CFTC - Updated Fridays)', '']
         ]}
     ).execute()
 
@@ -226,6 +232,16 @@ def write_to_sheet(service, fred_results, cot_results, is_friday):
             body={'values': [['COT FETCH FAILED - update manually from cftc.gov or barchart.com/cot']]}
         ).execute()
         return
+
+    # Fetch actually succeeded (is_friday and cot_results both true) - safe
+    # to stamp today's date now.
+    today = datetime.datetime.utcnow().strftime('%Y-%m-%d')
+    service.spreadsheets().values().update(
+        spreadsheetId=SPREADSHEET_ID,
+        range=TAB_NAME + '!C16',
+        valueInputOption='RAW',
+        body={'values': [['Last COT fetch: ' + today]]}
+    ).execute()
 
     cot_header = [['CURRENCY', 'NET POSITION', 'LONG', 'SHORT', 'AS OF DATE', 'SIGNAL']]
     service.spreadsheets().values().update(
