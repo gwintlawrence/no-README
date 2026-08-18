@@ -39,9 +39,16 @@ f4p_weekly_update.py and fred_cot_fetcher.py):
 import argparse
 import os
 import json
+import time
 
 import gspread
 from google.oauth2.service_account import Credentials
+
+# Paced to stay under Google's default Sheets API write quota (60/min/user).
+# Each currency now costs 3 write calls (clear, values update, one batched
+# formatting call) instead of ~8, plus this gap between currencies - well
+# under quota even for all 8 back-to-back, with margin to spare.
+PACE_SECONDS = 3
 
 
 CURRENCIES = ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"]
@@ -196,28 +203,49 @@ def build_dashboard(spreadsheet, ccy, dry_run=False):
     ws.clear()
     ws.update(values, "A1")
 
-    ws.merge_cells("A1:F1")
-    ws.format("A1:F1", {"textFormat": {"bold": True, "fontSize": 13}})
-    ws.format("A2:F2", {"textFormat": {"bold": True, "foregroundColor": HEADER_TEXT}, "backgroundColor": HEADER_FILL})
-    ws.format(f"A{cot_header_row}:F{cot_header_row}",
-              {"textFormat": {"bold": True, "foregroundColor": HEADER_TEXT}, "backgroundColor": HEADER_FILL})
-    ws.format(f"A{pairs_header_row}:F{pairs_header_row}",
-              {"textFormat": {"bold": True, "foregroundColor": HEADER_TEXT}, "backgroundColor": HEADER_FILL})
-
-    add_conditional_formatting(spreadsheet, ws, total_row, pairs_start_row, pairs_end_row)
+    # Everything below is ONE batched API call (merge + all cell formatting +
+    # all conditional formatting rules), not five-plus separate ones - this
+    # is what previously blew through the write-quota across 8 currencies.
+    apply_formatting(spreadsheet, ws, cot_header_row, pairs_header_row,
+                      total_row, pairs_start_row, pairs_end_row)
     print(f"  done - {tab_name} ({len(values)} rows)")
 
 
-def add_conditional_formatting(spreadsheet, ws, total_row, pairs_start_row, pairs_end_row):
+def apply_formatting(spreadsheet, ws, cot_header_row, pairs_header_row,
+                      total_row, pairs_start_row, pairs_end_row):
     sheet_id = ws.id
     requests = []
 
+    def grid(range_a1):
+        return gspread.utils.a1_range_to_grid_range(range_a1, sheet_id)
+
+    requests.append({
+        "mergeCells": {"range": grid("A1:F1"), "mergeType": "MERGE_ALL"}
+    })
+
+    def repeat_format(range_a1, text_format, bg=None):
+        cell_format = {"textFormat": text_format}
+        fields = "userEnteredFormat.textFormat"
+        if bg is not None:
+            cell_format["backgroundColor"] = bg
+            fields += ",userEnteredFormat.backgroundColor"
+        requests.append({
+            "repeatCell": {
+                "range": grid(range_a1),
+                "cell": {"userEnteredFormat": cell_format},
+                "fields": fields,
+            }
+        })
+
+    repeat_format("A1:F1", {"bold": True, "fontSize": 13})
+    for header_range in ("A2:F2", f"A{cot_header_row}:F{cot_header_row}", f"A{pairs_header_row}:F{pairs_header_row}"):
+        repeat_format(header_range, {"bold": True, "foregroundColor": HEADER_TEXT}, bg=HEADER_FILL)
+
     def add_rule(ranges_a1, text, color):
-        grid_ranges = [gspread.utils.a1_range_to_grid_range(r, sheet_id) for r in ranges_a1]
         requests.append({
             "addConditionalFormatRule": {
                 "rule": {
-                    "ranges": grid_ranges,
+                    "ranges": [grid(r) for r in ranges_a1],
                     "booleanRule": {
                         "condition": {"type": "TEXT_EQ", "values": [{"userEnteredValue": text}]},
                         "format": {"backgroundColor": color},
@@ -248,11 +276,25 @@ def main():
 
     spreadsheet = None if args.dry_run else connect_sheet()
     targets = [args.currency] if args.currency else CURRENCIES
-    for ccy in targets:
-        build_dashboard(spreadsheet, ccy, dry_run=args.dry_run)
+    for i, ccy in enumerate(targets):
+        for attempt in range(3):
+            try:
+                build_dashboard(spreadsheet, ccy, dry_run=args.dry_run)
+                break
+            except gspread.exceptions.APIError as exc:
+                if "429" in str(exc) and attempt < 2:
+                    wait = 20 * (attempt + 1)
+                    print(f"[setup] {ccy} hit a rate limit, waiting {wait}s and retrying...")
+                    time.sleep(wait)
+                else:
+                    raise
+        if not args.dry_run and i < len(targets) - 1:
+            time.sleep(PACE_SECONDS)
 
     print("[setup] Done.")
 
 
 if __name__ == "__main__":
     main()
+
+    
