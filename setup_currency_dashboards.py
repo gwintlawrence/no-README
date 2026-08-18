@@ -17,13 +17,16 @@ Data sources referenced (already live in the Hub - nothing new to fetch):
   - 'AI HUB DATA' tab  -> 15-indicator table + Total Score
   - 'FRED AUTO' tab    -> COT Long/Short/Net/Signal (rows 18-25)
 
-NOT yet wired: Pair Trade Readiness (Status/Signal/Bias/Explanation per
-pair). There is currently no live source for this anywhere in the Hub -
-see the open thread on connecting the Weekly Endogenous Engine's output
-into a PAIR_READINESS tab. Until that exists, this script writes the
-pair rows as placeholders. Re-run with --currency <CCY> to rebuild a
-single tab once that source exists, or extend build_dashboard() below to
-point the Explanation/Status/Signal/Bias formulas at the new tab.
+Pair Trade Readiness (Status/Signal/Bias/Explanation) is now computed
+live from those same two sources - Total Score gap between the pair's
+two legs (fundamentals) cross-checked against COT Signal for both legs
+(confirmation). That covers two of the three Cardinal Rule legs
+automatically. It does NOT cover technicals/MMM timing - there is no
+live source for that anywhere in the Hub, and the Explanation text says
+so explicitly rather than implying a full trade call. Richer, AI-written
+explanations (the kind the original xlsx templates had) would need the
+Weekly Endogenous Engine connected to the Hub - still an open thread,
+independent of this formula-based version.
 
 Usage:
   python setup_currency_dashboards.py                 # build all 8
@@ -94,10 +97,44 @@ WAIT_COLOR = {"red": 1.0, "green": 1.0, "blue": 0.0}
 STOP_COLOR = {"red": 1.0, "green": 0.0, "blue": 0.0}
 
 
+def score_expr(ccy):
+    return f"SUMIF('{HUB_TAB}'!$A:$A,\"{ccy}\",'{HUB_TAB}'!$J:$J)"
+
+
+def cot_signal_expr(ccy):
+    return f"IFERROR(QUERY('{FRED_TAB}'!{COT_RANGE},\"select F where A='{ccy}' limit 1\",0),\"\u2014\")"
+
+
+def base_quote(a, b):
+    ia, ib = PAIR_PRECEDENCE.index(a), PAIR_PRECEDENCE.index(b)
+    return (a, b) if ia < ib else (b, a)
+
+
+def pair_formulas(base, quote):
+    """Bias/Status/Explanation for a pair, computed live from Total Score
+    (fundamentals) and COT Signal (confirmation) already in the Hub -
+    the first two legs of the Cardinal Rule. Technicals/timing (the third
+    leg) still needs a human at the chart; nothing here claims otherwise."""
+    base_s, quote_s = score_expr(base), score_expr(quote)
+    gap = f"(({base_s})-({quote_s}))"
+
+    bias = f'=IF({gap}=0,"Neutral",IF({gap}>0,"Bullish","Bearish"))'
+    # >=3 point swing = Glenise's own "real shift" threshold from the
+    # Discussion Framework doc, not an arbitrary cutoff.
+    status = f'=IF(ABS({gap})>=3,"Go",IF(ABS({gap})>=1,"Wait","Stop"))'
+
+    base_cot, quote_cot = cot_signal_expr(base), cot_signal_expr(quote)
+    explanation = (
+        f'="{base} scores "&TEXT({base_s},"0")&" vs {quote} scores "&TEXT({quote_s},"0")'
+        f'&" (gap "&TEXT({gap},"0")&"). COT: {base} "&{base_cot}&", {quote} "&{quote_cot}'
+        f'&". Confirm technical timing before trading (Cardinal Rule)."'
+    )
+    return bias, status, explanation
+
+
 def pair_name(a, b):
     """Standard FX notation for the pair between two currencies."""
-    ia, ib = PAIR_PRECEDENCE.index(a), PAIR_PRECEDENCE.index(b)
-    base, quote = (a, b) if ia < ib else (b, a)
+    base, quote = base_quote(a, b)
     return f"{base}/{quote}"
 
 
@@ -185,14 +222,18 @@ def build_dashboard(spreadsheet, ccy, dry_run=False):
                     " each run with no history kept. Ping me once we want that tracked.", "", "", "", "", ""])
 
     values.append([""] * 6)
-    values.append([f"{ccy} Pairs Trade Readiness — PENDING (Weekly Endogenous Engine not yet connected to the Hub)",
+    values.append([f"{ccy} Pairs Trade Readiness — Fundamentals + COT (auto). Confirm technical timing before trading.",
                     "", "", "", "", ""])
     pairs_header_row = len(values) + 1
     values.append(["Currency Pair", "Status", "Signal", "Bias", "Explanation", ""])
     pairs_start_row = len(values) + 1
     others = [c for c in CURRENCIES if c != ccy]
-    for other in others:
-        values.append([pair_name(ccy, other), "—", "—", "—", "Pending pair-readiness data source", ""])
+    for row_offset, other in enumerate(others):
+        row_num = pairs_start_row + row_offset
+        base, quote = base_quote(ccy, other)
+        bias_f, status_f, explanation_f = pair_formulas(base, quote)
+        signal_f = f'=IF(B{row_num}="Go","🟢",IF(B{row_num}="Wait","🟡","🛑"))'
+        values.append([pair_name(ccy, other), status_f, signal_f, bias_f, explanation_f, ""])
     pairs_end_row = len(values)
 
     if dry_run:
