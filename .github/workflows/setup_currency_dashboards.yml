@@ -1,0 +1,55 @@
+name: F4P Currency Dashboard Setup (one-time)
+
+# No schedule - this is a one-time build, not part of the weekly pipeline.
+# Click "Run workflow" in the Actions tab whenever you need to (re)build one
+# or all 8 currency dashboard tabs.
+on:
+  workflow_dispatch:
+    inputs:
+      currency:
+        description: "Build one currency's tab, or 'all' for all 8"
+        type: choice
+        default: all
+        options:
+          - all
+          - USD
+          - EUR
+          - GBP
+          - JPY
+          - CHF
+          - CAD
+          - AUD
+          - NZD
+
+jobs:
+  build-dashboards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install gspread google-auth
+
+      - name: Run dashboard setup
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_SHEET_ID: ${{ secrets.GOOGLE_SHEET_ID }}
+        run: |
+          if [ "${{ inputs.currency || 'all' }}" = "all" ]; then
+            python setup_currency_dashboards.py
+          else
+            python setup_currency_dashboards.py --currency ${{ inputs.currency }}
+          fi
+
+      - name: Report failure
+        if: failure()
+        run: echo "::error::Dashboard setup failed. Check the log above."
