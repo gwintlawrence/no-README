@@ -201,7 +201,11 @@ def build_dashboard(spreadsheet, ccy, dry_run=False):
 
     ws = get_or_create_tab(spreadsheet, tab_name, rows=len(values) + 5, cols=6)
     ws.clear()
-    ws.update(values, "A1")
+    # raw=False is essential here - gspread defaults to raw=True, which
+    # stores "=IFERROR(...)" as a literal text string instead of an actual
+    # formula. This is what left every cell showing formula text instead of
+    # a calculated value on the first run.
+    ws.update(values, "A1", raw=False)
 
     # Everything below is ONE batched API call (merge + all cell formatting +
     # all conditional formatting rules), not five-plus separate ones - this
