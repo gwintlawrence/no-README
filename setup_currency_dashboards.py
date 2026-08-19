@@ -95,10 +95,20 @@ NEUTRAL_COLOR = {"red": 1.00, "green": 0.92, "blue": 0.61}
 GO_COLOR = {"red": 0.0, "green": 1.0, "blue": 0.0}
 WAIT_COLOR = {"red": 1.0, "green": 1.0, "blue": 0.0}
 STOP_COLOR = {"red": 1.0, "green": 0.0, "blue": 0.0}
+NO_DATA_COLOR = {"red": 0.85, "green": 0.85, "blue": 0.85}
 
 
 def score_expr(ccy):
+    """Raw numeric total - only safe to use once no_data(ccy) has been
+    checked, since SUMIF over zero matching rows silently returns 0."""
     return f"SUMIF('{HUB_TAB}'!$A:$A,\"{ccy}\",'{HUB_TAB}'!$J:$J)"
+
+
+def no_data_expr(ccy):
+    """True if AI HUB DATA has zero rows for this currency this week -
+    catches a failed pipeline batch (e.g. AUD) so it reads as 'no data'
+    instead of a false Total Score of 0."""
+    return f"COUNTIF('{HUB_TAB}'!$A:$A,\"{ccy}\")=0"
 
 
 def cot_signal_expr(ccy):
@@ -114,21 +124,31 @@ def pair_formulas(base, quote):
     """Bias/Status/Explanation for a pair, computed live from Total Score
     (fundamentals) and COT Signal (confirmation) already in the Hub -
     the first two legs of the Cardinal Rule. Technicals/timing (the third
-    leg) still needs a human at the chart; nothing here claims otherwise."""
+    leg) still needs a human at the chart; nothing here claims otherwise.
+
+    If either leg's weekly batch failed (AI HUB DATA has no rows for it -
+    the AUD situation), everything here reports N/A rather than silently
+    computing a gap against a false 0."""
     base_s, quote_s = score_expr(base), score_expr(quote)
     gap = f"(({base_s})-({quote_s}))"
+    missing = f"OR({no_data_expr(base)},{no_data_expr(quote)})"
 
-    bias = f'=IF({gap}=0,"Neutral",IF({gap}>0,"Bullish","Bearish"))'
+    bias = f'=IF({missing},"N/A",IF({gap}=0,"Neutral",IF({gap}>0,"Bullish","Bearish")))'
     # >=3 point swing = Glenise's own "real shift" threshold from the
     # Discussion Framework doc, not an arbitrary cutoff.
-    status = f'=IF(ABS({gap})>=3,"Go",IF(ABS({gap})>=1,"Wait","Stop"))'
+    status = f'=IF({missing},"N/A",IF(ABS({gap})>=3,"Go",IF(ABS({gap})>=1,"Wait","Stop")))'
 
     base_cot, quote_cot = cot_signal_expr(base), cot_signal_expr(quote)
-    explanation = (
-        f'="{base} scores "&TEXT({base_s},"0")&" vs {quote} scores "&TEXT({quote_s},"0")'
+    missing_explanation = (
+        f'"{base}/{quote}: one or both legs have no AI HUB DATA rows this week '
+        f'(likely a failed pipeline batch). Do not trade this pair until data is confirmed."'
+    )
+    normal_explanation = (
+        f'"{base} scores "&TEXT({base_s},"0")&" vs {quote} scores "&TEXT({quote_s},"0")'
         f'&" (gap "&TEXT({gap},"0")&"). COT: {base} "&{base_cot}&", {quote} "&{quote_cot}'
         f'&". Confirm technical timing before trading (Cardinal Rule)."'
     )
+    explanation = f'=IF({missing},{missing_explanation},{normal_explanation})'
     return bias, status, explanation
 
 
@@ -171,9 +191,13 @@ def fred_lookup(column_letter, ccy):
 
 
 def bias_formula(score_cell):
+    """Bullish/Bearish/Neutral from a score cell - but if the cell itself
+    is a missing-data sentinel (em-dash from a per-indicator lookup, or
+    N/A from a guarded Total Score), echo that back rather than letting
+    N() silently coerce missing data to 0 -> a false 'Neutral'."""
     return (
-        '=IF(%s="","—",IF(N(%s)>0,"Bullish",IF(N(%s)<0,"Bearish","Neutral")))'
-        % (score_cell, score_cell, score_cell)
+        '=IF(OR(%s="\u2014",%s="N/A"),%s,IF(N(%s)>0,"Bullish",IF(N(%s)<0,"Bearish","Neutral")))'
+        % (score_cell, score_cell, score_cell, score_cell, score_cell)
     )
 
 
@@ -201,7 +225,7 @@ def build_dashboard(spreadsheet, ccy, dry_run=False):
     values.append([
         "TOTAL SCORE", "", "",
         bias_formula(f"E{total_row}"),
-        f"=SUMIF('{HUB_TAB}'!$A:$A,\"{ccy}\",'{HUB_TAB}'!$J:$J)",
+        f'=IF({no_data_expr(ccy)},"N/A",{score_expr(ccy)})',
         "",
     ])
 
@@ -232,7 +256,7 @@ def build_dashboard(spreadsheet, ccy, dry_run=False):
         row_num = pairs_start_row + row_offset
         base, quote = base_quote(ccy, other)
         bias_f, status_f, explanation_f = pair_formulas(base, quote)
-        signal_f = f'=IF(B{row_num}="Go","🟢",IF(B{row_num}="Wait","🟡","🛑"))'
+        signal_f = f'=IF(B{row_num}="Go","🟢",IF(B{row_num}="Wait","🟡",IF(B{row_num}="N/A","⚪","🛑")))'
         values.append([pair_name(ccy, other), status_f, signal_f, bias_f, explanation_f, ""])
     pairs_end_row = len(values)
 
@@ -304,11 +328,14 @@ def apply_formatting(spreadsheet, ws, cot_header_row, pairs_header_row,
     add_rule(bias_ranges, "Bullish", BULLISH_COLOR)
     add_rule(bias_ranges, "Bearish", BEARISH_COLOR)
     add_rule(bias_ranges, "Neutral", NEUTRAL_COLOR)
+    add_rule(bias_ranges, "\u2014", NO_DATA_COLOR)
+    add_rule(bias_ranges, "N/A", NO_DATA_COLOR)
 
     status_range = [f"B{pairs_start_row}:B{pairs_end_row}"]
     add_rule(status_range, "Go", GO_COLOR)
     add_rule(status_range, "Wait", WAIT_COLOR)
     add_rule(status_range, "Stop", STOP_COLOR)
+    add_rule(status_range, "N/A", NO_DATA_COLOR)
 
     spreadsheet.batch_update({"requests": requests})
 
