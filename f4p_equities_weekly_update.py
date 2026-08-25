@@ -5,19 +5,24 @@ Phase 1 of the F4P Equities & Options weekly pipeline.
 Pulls a field-verified subset of indicators directly from Alpha Vantage's
 REST API and writes flat +/-2 scored rows into the EQUITIES HUB DATA tab.
 
-Phase 1 covers 4 of the planned 18-indicator framework - the ones with
-schemas confirmed live on 2026-08-25:
+Covers 7 of the planned 18-indicator framework - all with schemas
+confirmed live on 2026-08-25:
   1.  EPS Surprise                    (Company Endogenous)
+  2.  Revenue Surprise                (Company Endogenous)
+  4.  Analyst Estimate Revisions      (Company Endogenous, 90-day)
+  5.  Operating Margin Trend          (Company Endogenous, YoY)
   14. Institutional Holdings Sentiment (Confirmation layer)
   15. Put/Call Ratio                  (Confirmation layer)
   18. Price Momentum Pulse            (Phase 1 stand-in for full Technical
                                         Setup - flagged in the Tag column)
 
-Everything else in the framework (forward guidance, catalyst pipeline,
-analyst estimate revisions, margin trend, macro overlay, sector/peer
-relative strength, insider activity, IV rank, IV/HV spread) is Phase 2:
-either needs an endpoint not yet schema-verified, or needs Claude for
-qualitative synthesis rather than a numeric threshold.
+Still outstanding (Phase 3): forward guidance, catalyst pipeline,
+insider activity (endpoint returned repeated errors during testing -
+needs a fresh look), macro overlay (4 indicators - should cross-reference
+the FX Hub's existing tabs rather than re-fetch), sector/peer relative
+strength (3 indicators), IV rank, IV/HV spread. Forward guidance and
+catalyst pipeline need Claude for qualitative synthesis rather than a
+numeric threshold - different mechanism from everything else here.
 
 Required secrets:
   GOOGLE_CREDENTIALS      - same service account used by the FX pipeline
@@ -111,6 +116,48 @@ def score_put_call_ratio(ratio):
     return 0, f"Neutral: P/C {ratio:.2f}"
 
 
+def score_revenue_surprise(surprise_pct):
+    if surprise_pct is None:
+        return 0, "N/A - no revenue estimate available"
+    if surprise_pct >= 5:
+        return 2, f"Strong revenue beat: {surprise_pct:+.1f}% vs estimate"
+    if surprise_pct >= 1:
+        return 1, f"Modest revenue beat: {surprise_pct:+.1f}% vs estimate"
+    if surprise_pct <= -5:
+        return -2, f"Significant revenue miss: {surprise_pct:+.1f}% vs estimate"
+    if surprise_pct <= -1:
+        return -1, f"Modest revenue miss: {surprise_pct:+.1f}% vs estimate"
+    return 0, f"In-line revenue: {surprise_pct:+.1f}% vs estimate"
+
+
+def score_estimate_revision(revision_pct):
+    if revision_pct is None:
+        return 0, "N/A - insufficient estimate history"
+    if revision_pct >= 3:
+        return 2, f"Estimates raised {revision_pct:+.1f}% over 90 days"
+    if revision_pct >= 1:
+        return 1, f"Estimates mildly raised {revision_pct:+.1f}% over 90 days"
+    if revision_pct <= -3:
+        return -2, f"Estimates cut {revision_pct:+.1f}% over 90 days"
+    if revision_pct <= -1:
+        return -1, f"Estimates mildly cut {revision_pct:+.1f}% over 90 days"
+    return 0, f"Estimates stable: {revision_pct:+.1f}% over 90 days"
+
+
+def score_margin_trend(margin_change_pts):
+    if margin_change_pts is None:
+        return 0, "N/A - insufficient margin history"
+    if margin_change_pts >= 2:
+        return 2, f"Operating margin expanding: {margin_change_pts:+.1f}pts YoY"
+    if margin_change_pts >= 0.5:
+        return 1, f"Operating margin mildly expanding: {margin_change_pts:+.1f}pts YoY"
+    if margin_change_pts <= -2:
+        return -2, f"Operating margin compressing: {margin_change_pts:+.1f}pts YoY"
+    if margin_change_pts <= -0.5:
+        return -1, f"Operating margin mildly compressing: {margin_change_pts:+.1f}pts YoY"
+    return 0, f"Operating margin stable: {margin_change_pts:+.1f}pts YoY"
+
+
 def score_momentum(change_pct):
     """Temporary stand-in for full Technical Setup. A single day's change
     is a weak proxy on its own - Phase 2 replaces this with MA structure
@@ -154,6 +201,94 @@ def fetch_ticker_data(ticker, api_key):
         ])
     except Exception as e:
         print(f"[FAIL] {ticker} EPS Surprise: {e}")
+
+    # Revenue Surprise + Analyst Estimate Revisions both draw on
+    # EARNINGS_ESTIMATES - fetch once, use for both.
+    estimates = {}
+    try:
+        estimates = av_request({"function": "EARNINGS_ESTIMATES", "symbol": ticker}, api_key)
+        quarterly_estimates = [
+            e for e in (estimates.get("estimates") or []) if e.get("horizon") == "fiscal quarter"
+        ]
+        if quarterly_estimates:
+            latest_est = quarterly_estimates[0]
+            avg = latest_est.get("eps_estimate_average")
+            avg_90 = latest_est.get("eps_estimate_average_90_days_ago")
+            revision_pct = None
+            if avg not in (None, "None") and avg_90 not in (None, "None") and float(avg_90) != 0:
+                revision_pct = (float(avg) - float(avg_90)) / abs(float(avg_90)) * 100
+            score, note = score_estimate_revision(revision_pct)
+            revision_display = f"'{revision_pct:+.2f}%" if revision_pct is not None else "N/A"
+            rows.append([
+                ticker, 4, "Analyst Estimate Revisions (90-day)",
+                avg or "N/A", avg_90 or "N/A", "N/A", revision_display,
+                latest_est.get("date", today), "Endogenous", score, note,
+                "Alpha Vantage: EARNINGS_ESTIMATES",
+            ])
+        else:
+            rows.append([
+                ticker, 4, "Analyst Estimate Revisions (90-day)",
+                "N/A", "N/A", "N/A", "N/A", today, "Endogenous", 0,
+                "N/A - no quarterly estimate history", "Alpha Vantage: EARNINGS_ESTIMATES",
+            ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} Estimate Revisions: {e}")
+
+    try:
+        income = av_request({"function": "INCOME_STATEMENT", "symbol": ticker}, api_key)
+        q_reports = income.get("quarterlyReports") or []
+        if q_reports:
+            latest_q_report = q_reports[0]
+            actual_revenue = latest_q_report.get("totalRevenue")
+            fiscal_date = latest_q_report.get("fiscalDateEnding")
+
+            est_match = next(
+                (e for e in (estimates.get("estimates") or [])
+                 if e.get("date") == fiscal_date and e.get("horizon") == "fiscal quarter"),
+                None
+            )
+            revenue_surprise_pct = None
+            est_revenue = est_match.get("revenue_estimate_average") if est_match else None
+            if (actual_revenue not in (None, "None") and est_revenue not in (None, "None")
+                    and float(est_revenue) != 0):
+                revenue_surprise_pct = (float(actual_revenue) - float(est_revenue)) / float(est_revenue) * 100
+            score, note = score_revenue_surprise(revenue_surprise_pct)
+            rev_display = f"'{revenue_surprise_pct:+.2f}%" if revenue_surprise_pct is not None else "N/A"
+            rows.append([
+                ticker, 2, "Revenue Surprise",
+                actual_revenue or "N/A", est_revenue or "N/A", "N/A", rev_display,
+                fiscal_date or today, "Endogenous", score, note,
+                "Alpha Vantage: INCOME_STATEMENT + EARNINGS_ESTIMATES",
+            ])
+
+            margin_change = None
+            op_margin_now = None
+            op_margin_prior = None
+            if len(q_reports) > 4:
+                prior_year_q = q_reports[4]
+                try:
+                    op_margin_now = float(latest_q_report["operatingIncome"]) / float(latest_q_report["totalRevenue"]) * 100
+                    op_margin_prior = float(prior_year_q["operatingIncome"]) / float(prior_year_q["totalRevenue"]) * 100
+                    margin_change = op_margin_now - op_margin_prior
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    margin_change = None
+            score, note = score_margin_trend(margin_change)
+            margin_display = f"'{margin_change:+.2f}pts" if margin_change is not None else "N/A"
+            rows.append([
+                ticker, 5, "Operating Margin Trend (YoY)",
+                f"{op_margin_now:.1f}%" if op_margin_now is not None else "N/A",
+                f"{op_margin_prior:.1f}%" if op_margin_prior is not None else "N/A",
+                "N/A", margin_display, fiscal_date or today, "Endogenous", score, note,
+                "Alpha Vantage: INCOME_STATEMENT",
+            ])
+        else:
+            rows.append([
+                ticker, 2, "Revenue Surprise", "N/A", "N/A", "N/A", "N/A", today,
+                "Endogenous", 0, "N/A - no income statement data",
+                "Alpha Vantage: INCOME_STATEMENT",
+            ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} Revenue Surprise / Margin Trend: {e}")
 
     try:
         holdings = av_request({"function": "INSTITUTIONAL_HOLDINGS", "symbol": ticker}, api_key)
