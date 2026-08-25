@@ -404,17 +404,15 @@ def fetch_ticker_data(ticker, api_key):
             {"function": "INSIDER_TRANSACTIONS", "symbol": ticker, "from_date": lookback_date},
             api_key,
         )
-        transactions = insider.get("data") or []
-
-        # --- TEMPORARY DIAGNOSTIC - remove once from_date behavior is confirmed ---
-        if transactions:
-            dates_seen = [t.get("transaction_date") for t in transactions if t.get("transaction_date")]
-            print(f"[DEBUG] {ticker} insider: requested from_date={lookback_date}, "
-                  f"got {len(transactions)} rows, actual date range "
-                  f"{min(dates_seen)} to {max(dates_seen)}")
-        else:
-            print(f"[DEBUG] {ticker} insider: requested from_date={lookback_date}, got 0 rows")
-        # --- END TEMPORARY DIAGNOSTIC ---
+        # The from_date parameter is NOT reliably honored by the raw REST
+        # API - confirmed via diagnostic logging on 2026-08-25, where a
+        # 90-day request for NVDA returned 6,920 rows spanning 2003-2026.
+        # Filtering client-side instead of trusting the server to scope it.
+        transactions_raw = insider.get("data") or []
+        transactions = [
+            t for t in transactions_raw
+            if t.get("transaction_date") and t["transaction_date"] >= lookback_date
+        ]
 
         buy_value = 0.0
         sell_value = 0.0
