@@ -405,6 +405,17 @@ def fetch_ticker_data(ticker, api_key):
             api_key,
         )
         transactions = insider.get("data") or []
+
+        # --- TEMPORARY DIAGNOSTIC - remove once from_date behavior is confirmed ---
+        if transactions:
+            dates_seen = [t.get("transaction_date") for t in transactions if t.get("transaction_date")]
+            print(f"[DEBUG] {ticker} insider: requested from_date={lookback_date}, "
+                  f"got {len(transactions)} rows, actual date range "
+                  f"{min(dates_seen)} to {max(dates_seen)}")
+        else:
+            print(f"[DEBUG] {ticker} insider: requested from_date={lookback_date}, got 0 rows")
+        # --- END TEMPORARY DIAGNOSTIC ---
+
         buy_value = 0.0
         sell_value = 0.0
         for t in transactions:
