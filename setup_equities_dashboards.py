@@ -1,4 +1,4 @@
-    """
+"""
 setup_equities_dashboards.py
 
 Creates/refreshes the tab structure for the F4P Equities & Options Scorecard.
@@ -25,17 +25,14 @@ SCOPES = [
 ]
 
 TAB_DEFINITIONS = {
-    # Mirrors AI HUB DATA — one row per ticker per indicator
     "EQUITIES HUB DATA": [
         "Ticker", "Indicator #", "Indicator", "Current Value", "Prior Value",
         "Forecast", "Surprise", "Release Date", "Tag", "F4P Score",
         "Institutional Analysis", "Source/Audit Link",
     ],
-    # Mirrors AI RANKINGS — aggregated per-ticker totals
     "EQUITY RANKINGS": [
         "Ticker", "Total Score", "Bias", "Status", "Signal", "Last Updated",
     ],
-    # Confirmation + Volatility layers (COT equivalent for equities)
     "OPTIONS FLOW & IV": [
         "Ticker", "Put/Call Ratio", "IV Rank", "IV Percentile",
         "Unusual Volume Flag", "Institutional Holdings Change (delta)",
@@ -45,12 +42,9 @@ TAB_DEFINITIONS = {
         "Ticker", "Next Earnings Date", "EPS Estimate", "Prior EPS",
         "Revenue Estimate", "Days to Event",
     ],
-    # Cross-referenced from the FX Hub's CENTRAL BANK / EXOGENOUS tabs —
-    # not re-collected here
     "SECTOR & MACRO OVERLAY": [
         "Indicator", "Value", "Source Tab Reference", "Last Updated",
     ],
-    # Team-facing output — matches the Stocks to Watch graphic format
     "STRATEGY DASHBOARD": [
         "Ticker", "Catalyst", "Technical Setup", "Options Strategy Idea",
         "Total Score", "Bias", "Status/Signal", "Expiration Window",
@@ -82,8 +76,6 @@ def get_spreadsheet(client):
 
 
 def ensure_tab(spreadsheet, tab_name, headers):
-    """Create the tab if missing, then (re)write the header row.
-    Wrapped in try/except so one tab's failure never blocks the others."""
     try:
         try:
             ws = spreadsheet.worksheet(tab_name)
@@ -108,8 +100,6 @@ def main():
     client = get_client()
     spreadsheet = get_spreadsheet(client)
 
-    # Rename the default blank "Sheet1" out of the way if present, so it
-    # doesn't get confused for a real tab
     try:
         default_ws = spreadsheet.worksheet("Sheet1")
         if default_ws.row_count <= 1000 and not default_ws.get_all_values():
@@ -133,5 +123,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    
