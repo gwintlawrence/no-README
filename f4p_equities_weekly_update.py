@@ -5,16 +5,25 @@ Phase 1 of the F4P Equities & Options weekly pipeline.
 Pulls a field-verified subset of indicators directly from Alpha Vantage's
 REST API and writes flat +/-2 scored rows into the EQUITIES HUB DATA tab.
 
-Covers 7 of the planned 18-indicator framework - all with schemas
+Covers 8 of the planned 18-indicator framework - all with schemas
 confirmed live on 2026-08-25:
   1.  EPS Surprise                    (Company Endogenous)
   2.  Revenue Surprise                (Company Endogenous)
+  3.  Gross Margin Trend              (Company Endogenous, QoQ, cost mix)
   4.  Analyst Estimate Revisions      (Company Endogenous, 90-day)
-  5.  Operating Margin Trend          (Company Endogenous, YoY)
+  5.  Operating Margin Trend          (Company Endogenous, YoY, opex leverage)
   14. Institutional Holdings Sentiment (Confirmation layer)
   15. Put/Call Ratio                  (Confirmation layer)
   18. Price Momentum Pulse            (Phase 1 stand-in for full Technical
                                         Setup - flagged in the Tag column)
+
+Note: indicators 3 and 5 look similar at a glance (both "margin trend") but
+measure genuinely different things - verified against NVDA's actual filed
+numbers on 2026-08-25 after a discrepancy was flagged and traced by hand.
+Gross Margin Trend is sequential (QoQ) and reflects direct cost mix.
+Operating Margin Trend is year-over-year and reflects operating leverage
+(revenue growth outpacing opex growth). Both are legitimate signals; they
+are not redundant with each other despite the similar name.
 
 Still outstanding (Phase 3): forward guidance, catalyst pipeline,
 insider activity (endpoint returned repeated errors during testing -
@@ -148,14 +157,31 @@ def score_margin_trend(margin_change_pts):
     if margin_change_pts is None:
         return 0, "N/A - insufficient margin history"
     if margin_change_pts >= 2:
-        return 2, f"Operating margin expanding: {margin_change_pts:+.1f}pts YoY"
+        return 2, f"Operating margin expanding: {margin_change_pts:+.1f}pts YoY (opex leverage)"
     if margin_change_pts >= 0.5:
-        return 1, f"Operating margin mildly expanding: {margin_change_pts:+.1f}pts YoY"
+        return 1, f"Operating margin mildly expanding: {margin_change_pts:+.1f}pts YoY (opex leverage)"
     if margin_change_pts <= -2:
-        return -2, f"Operating margin compressing: {margin_change_pts:+.1f}pts YoY"
+        return -2, f"Operating margin compressing: {margin_change_pts:+.1f}pts YoY (opex leverage)"
     if margin_change_pts <= -0.5:
-        return -1, f"Operating margin mildly compressing: {margin_change_pts:+.1f}pts YoY"
-    return 0, f"Operating margin stable: {margin_change_pts:+.1f}pts YoY"
+        return -1, f"Operating margin mildly compressing: {margin_change_pts:+.1f}pts YoY (opex leverage)"
+    return 0, f"Operating margin stable: {margin_change_pts:+.1f}pts YoY (opex leverage)"
+
+
+def score_gross_margin_qoq(margin_change_pts):
+    """Gross margin moves in much smaller increments than operating margin,
+    so it uses its own tighter thresholds - the CPI 'is it alarming' logic
+    scaled down to this metric's normal range."""
+    if margin_change_pts is None:
+        return 0, "N/A - insufficient margin history"
+    if margin_change_pts >= 1:
+        return 2, f"Gross margin expanding: {margin_change_pts:+.2f}pts QoQ (cost mix)"
+    if margin_change_pts >= 0.25:
+        return 1, f"Gross margin mildly expanding: {margin_change_pts:+.2f}pts QoQ (cost mix)"
+    if margin_change_pts <= -1:
+        return -2, f"Gross margin compressing: {margin_change_pts:+.2f}pts QoQ (cost mix)"
+    if margin_change_pts <= -0.25:
+        return -1, f"Gross margin mildly compressing: {margin_change_pts:+.2f}pts QoQ (cost mix)"
+    return 0, f"Gross margin stable: {margin_change_pts:+.2f}pts QoQ (cost mix)"
 
 
 def score_momentum(change_pct):
@@ -275,11 +301,33 @@ def fetch_ticker_data(ticker, api_key):
             score, note = score_margin_trend(margin_change)
             margin_display = f"'{margin_change:+.2f}pts" if margin_change is not None else "N/A"
             rows.append([
-                ticker, 5, "Operating Margin Trend (YoY)",
+                ticker, 5, "Operating Margin Trend (YoY, opex leverage)",
                 f"{op_margin_now:.1f}%" if op_margin_now is not None else "N/A",
                 f"{op_margin_prior:.1f}%" if op_margin_prior is not None else "N/A",
                 "N/A", margin_display, fiscal_date or today, "Endogenous", score, note,
                 "Alpha Vantage: INCOME_STATEMENT",
+            ])
+
+            gross_margin_change = None
+            gross_margin_now = None
+            gross_margin_prior_q = None
+            if len(q_reports) > 1:
+                prior_quarter = q_reports[1]
+                try:
+                    gross_margin_now = float(latest_q_report["grossProfit"]) / float(latest_q_report["totalRevenue"]) * 100
+                    gross_margin_prior_q = float(prior_quarter["grossProfit"]) / float(prior_quarter["totalRevenue"]) * 100
+                    gross_margin_change = gross_margin_now - gross_margin_prior_q
+                except (ValueError, ZeroDivisionError, KeyError, TypeError):
+                    gross_margin_change = None
+            score, note = score_gross_margin_qoq(gross_margin_change)
+            gross_display = f"'{gross_margin_change:+.2f}pts" if gross_margin_change is not None else "N/A"
+            rows.append([
+                ticker, 3, "Gross Margin Trend (QoQ, cost mix)",
+                f"{gross_margin_now:.1f}%" if gross_margin_now is not None else "N/A",
+                f"{gross_margin_prior_q:.1f}%" if gross_margin_prior_q is not None else "N/A",
+                "N/A", gross_display,
+                prior_quarter.get("fiscalDateEnding", today) if len(q_reports) > 1 else today,
+                "Endogenous", score, note, "Alpha Vantage: INCOME_STATEMENT",
             ])
         else:
             rows.append([
