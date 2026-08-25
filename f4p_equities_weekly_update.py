@@ -139,10 +139,16 @@ def fetch_ticker_data(ticker, api_key):
         raw_surprise = latest_q.get("surprisePercentage")
         surprise_pct = float(raw_surprise) if raw_surprise not in (None, "None") else None
         score, note = score_eps_surprise(surprise_pct)
+        # Leading apostrophe forces Sheets to store this as literal text
+        # regardless of sign. Without it, Sheets auto-parses positive
+        # percentage-looking strings into numbers (stripping the "%") while
+        # leaving negative ones as text - same column, two different types,
+        # silently breaks any SUMIF/comparison built on it later.
+        surprise_display = f"'{surprise_pct:+.2f}%" if surprise_pct is not None else "N/A"
         rows.append([
             ticker, 1, "EPS Surprise",
             latest_q.get("reportedEPS", "N/A"), latest_q.get("estimatedEPS", "N/A"),
-            "N/A", f"{surprise_pct:+.2f}%" if surprise_pct is not None else "N/A",
+            "N/A", surprise_display,
             latest_q.get("reportedDate", "N/A"), "Endogenous", score, note,
             "Alpha Vantage: EARNINGS",
         ])
@@ -184,10 +190,11 @@ def fetch_ticker_data(ticker, api_key):
         raw_change = quote.get("changePercent", "")
         change_pct = float(raw_change.replace("%", "")) if raw_change else None
         score, note = score_momentum(change_pct)
+        change_display = f"'{raw_change}" if raw_change else "N/A"
         rows.append([
             ticker, 18, "Price Momentum Pulse (Phase 1 stand-in)",
             quote.get("price", "N/A"), quote.get("previousClose", "N/A"), "N/A",
-            raw_change or "N/A", quote.get("latestDay", today),
+            change_display, quote.get("latestDay", today),
             "Technical-Placeholder", score, note,
             "Alpha Vantage: GLOBAL_QUOTE",
         ])
