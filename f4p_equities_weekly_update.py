@@ -5,7 +5,7 @@ Phase 1 of the F4P Equities & Options weekly pipeline.
 Pulls a field-verified subset of indicators directly from Alpha Vantage's
 REST API and writes flat +/-2 scored rows into the EQUITIES HUB DATA tab.
 
-Covers 8 of the planned 18-indicator framework - all with schemas
+Covers 9 of the planned 18-indicator framework - all with schemas
 confirmed live on 2026-08-25:
   1.  EPS Surprise                    (Company Endogenous)
   2.  Revenue Surprise                (Company Endogenous)
@@ -14,6 +14,11 @@ confirmed live on 2026-08-25:
   5.  Operating Margin Trend          (Company Endogenous, YoY, opex leverage)
   14. Institutional Holdings Sentiment (Confirmation layer)
   15. Put/Call Ratio                  (Confirmation layer)
+  16. Insider Activity                (Confirmation layer, 90-day, priced
+                                        transactions only - RSU vests/grants
+                                        at $0 excluded; heavy selling flagged
+                                        as possibly-routine 10b5-1 activity,
+                                        not assumed bearish)
   18. Price Momentum Pulse            (Phase 1 stand-in for full Technical
                                         Setup - flagged in the Tag column)
 
@@ -44,6 +49,7 @@ import json
 import csv
 import io
 import time
+from datetime import datetime, timedelta
 import requests
 import gspread
 from google.oauth2.service_account import Credentials
@@ -182,6 +188,22 @@ def score_gross_margin_qoq(margin_change_pts):
     if margin_change_pts <= -0.25:
         return -1, f"Gross margin mildly compressing: {margin_change_pts:+.2f}pts QoQ (cost mix)"
     return 0, f"Gross margin stable: {margin_change_pts:+.2f}pts QoQ (cost mix)"
+
+
+def score_insider_activity(net_ratio):
+    if net_ratio is None:
+        return 0, "N/A - no priced insider transactions in 90-day window"
+    if net_ratio >= 0.5:
+        return 2, f"Insider buying dominant: net ratio {net_ratio:+.2f}"
+    if net_ratio >= 0.15:
+        return 1, f"Mild insider buying lean: net ratio {net_ratio:+.2f}"
+    if net_ratio <= -0.5:
+        return -2, (f"Insider selling dominant: net ratio {net_ratio:+.2f} "
+                     f"(note: often routine 10b5-1 plan activity at large caps, not necessarily bearish)")
+    if net_ratio <= -0.15:
+        return -1, (f"Mild insider selling lean: net ratio {net_ratio:+.2f} "
+                     f"(note: often routine 10b5-1 plan activity, not necessarily bearish)")
+    return 0, f"Balanced insider activity: net ratio {net_ratio:+.2f}"
 
 
 def score_momentum(change_pct):
@@ -375,6 +397,41 @@ def fetch_ticker_data(ticker, api_key):
         ])
     except Exception as e:
         print(f"[FAIL] {ticker} Put/Call Ratio: {e}")
+
+    try:
+        lookback_date = (datetime.utcnow() - timedelta(days=90)).strftime("%Y-%m-%d")
+        insider = av_request(
+            {"function": "INSIDER_TRANSACTIONS", "symbol": ticker, "from_date": lookback_date},
+            api_key,
+        )
+        transactions = insider.get("data") or []
+        buy_value = 0.0
+        sell_value = 0.0
+        for t in transactions:
+            try:
+                price = float(t.get("share_price") or 0)
+                shares = float(t.get("shares") or 0)
+            except (ValueError, TypeError):
+                continue
+            if price <= 0:
+                continue  # RSU vest/grant, not a market transaction - excluded
+            direction = t.get("acquisition_or_disposal")
+            if direction == "A":
+                buy_value += shares * price
+            elif direction == "D":
+                sell_value += shares * price
+        total = buy_value + sell_value
+        net_ratio = (buy_value - sell_value) / total if total > 0 else None
+        score, note = score_insider_activity(net_ratio)
+        ratio_display = f"'{net_ratio:+.2f}" if net_ratio is not None else "N/A"
+        rows.append([
+            ticker, 16, "Insider Activity (90-day, priced transactions only)",
+            f"${buy_value:,.0f} bought", f"${sell_value:,.0f} sold", "N/A", ratio_display,
+            today, "Confirmation", score, note,
+            "Alpha Vantage: INSIDER_TRANSACTIONS",
+        ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} Insider Activity: {e}")
 
     try:
         quote = av_request(
