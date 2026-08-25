@@ -5,20 +5,21 @@ Phase 1 of the F4P Equities & Options weekly pipeline.
 Pulls a field-verified subset of indicators directly from Alpha Vantage's
 REST API and writes flat +/-2 scored rows into the EQUITIES HUB DATA tab.
 
-Covers 9 of the planned 18-indicator framework - all with schemas
+Covers 10 of the planned 18-indicator framework - all with schemas
 confirmed live on 2026-08-25:
   1.  EPS Surprise                    (Company Endogenous)
   2.  Revenue Surprise                (Company Endogenous)
   3.  Gross Margin Trend              (Company Endogenous, QoQ, cost mix)
   4.  Analyst Estimate Revisions      (Company Endogenous, 90-day)
   5.  Operating Margin Trend          (Company Endogenous, YoY, opex leverage)
+  11. Relative Strength vs SPY        (Sector/Relative Strength, 21-trading-day,
+                                        adjusted close, sector ETF context in notes)
   14. Institutional Holdings Sentiment (Confirmation layer)
   15. Put/Call Ratio                  (Confirmation layer)
   16. Insider Activity                (Confirmation layer, 90-day, priced
-                                        transactions only - RSU vests/grants
-                                        at $0 excluded; heavy selling flagged
-                                        as possibly-routine 10b5-1 activity,
-                                        not assumed bearish)
+                                        transactions only, client-side date
+                                        filtered - from_date param confirmed
+                                        NOT honored server-side on 2026-08-25)
   18. Price Momentum Pulse            (Phase 1 stand-in for full Technical
                                         Setup - flagged in the Tag column)
 
@@ -61,12 +62,29 @@ SCOPES = [
 
 WATCHLIST = ["NVDA", "AAPL", "AMZN", "GOOGL", "TSLA", "META", "COIN", "NFLX", "QQQ"]
 
+# QQQ maps to None deliberately - it's itself an index (Nasdaq-100), so it's
+# compared directly to SPY rather than to a sector layer on top of that.
+SECTOR_ETF_MAP = {
+    "NVDA": "XLK",   # Technology
+    "AAPL": "XLK",   # Technology
+    "AMZN": "XLY",   # Consumer Discretionary
+    "GOOGL": "XLC",  # Communication Services
+    "TSLA": "XLY",   # Consumer Discretionary
+    "META": "XLC",   # Communication Services
+    "COIN": "XLF",   # Financials (closest GICS fit for a crypto exchange)
+    "NFLX": "XLC",   # Communication Services
+    "QQQ": None,
+}
+
 AV_BASE = "https://www.alphavantage.co/query"
 
 
-def av_request(params, api_key, retries=3):
+def av_request(params, api_key, retries=3, csv_all_rows=False):
     """Isolated request wrapper - backs off on Alpha Vantage rate-limit
-    notes rather than treating them as hard failures."""
+    notes rather than treating them as hard failures.
+    csv_all_rows=True returns every parsed row (for time series);
+    otherwise only the first row is returned (for single-row responses
+    like GLOBAL_QUOTE)."""
     query = {**params, "apikey": api_key}
     for attempt in range(retries):
         resp = requests.get(AV_BASE, params=query, timeout=30)
@@ -74,6 +92,8 @@ def av_request(params, api_key, retries=3):
         if query.get("datatype") == "csv":
             reader = csv.DictReader(io.StringIO(resp.text))
             rows = list(reader)
+            if csv_all_rows:
+                return rows
             return rows[0] if rows else {}
         data = resp.json()
         if "Note" in data or "Information" in data:
@@ -190,6 +210,38 @@ def score_gross_margin_qoq(margin_change_pts):
     return 0, f"Gross margin stable: {margin_change_pts:+.2f}pts QoQ (cost mix)"
 
 
+def compute_21d_return(daily_rows):
+    """daily_rows: parsed CSV rows from TIME_SERIES_DAILY_ADJUSTED, most
+    recent first (Alpha Vantage's default order). Returns percent return
+    over the trailing 21 trading days (~1 calendar month) using adjusted
+    close, so dividend events don't distort the number. None if there
+    isn't enough history."""
+    if len(daily_rows) < 22:
+        return None
+    try:
+        recent = float(daily_rows[0]["adjusted_close"])
+        prior = float(daily_rows[20]["adjusted_close"])
+        if prior == 0:
+            return None
+        return (recent - prior) / prior * 100
+    except (KeyError, ValueError, TypeError):
+        return None
+
+
+def score_relative_strength(rel_pct):
+    if rel_pct is None:
+        return 0, "N/A - insufficient price history"
+    if rel_pct >= 8:
+        return 2, f"Strong outperformance vs SPY: {rel_pct:+.1f}pts over 21 trading days"
+    if rel_pct >= 3:
+        return 1, f"Mild outperformance vs SPY: {rel_pct:+.1f}pts over 21 trading days"
+    if rel_pct <= -8:
+        return -2, f"Strong underperformance vs SPY: {rel_pct:+.1f}pts over 21 trading days"
+    if rel_pct <= -3:
+        return -1, f"Mild underperformance vs SPY: {rel_pct:+.1f}pts over 21 trading days"
+    return 0, f"Tracking SPY: {rel_pct:+.1f}pts over 21 trading days"
+
+
 def score_insider_activity(net_ratio):
     if net_ratio is None:
         return 0, "N/A - no priced insider transactions in 90-day window"
@@ -224,7 +276,7 @@ def score_momentum(change_pct):
     return 0, f"Flat: {change_pct:+.2f}%"
 
 
-def fetch_ticker_data(ticker, api_key):
+def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector_etf_symbol):
     rows = []
     today = time.strftime("%Y-%m-%d")
 
@@ -443,6 +495,32 @@ def fetch_ticker_data(ticker, api_key):
         print(f"[FAIL] {ticker} Insider Activity: {e}")
 
     try:
+        own_series = av_request(
+            {"function": "TIME_SERIES_DAILY_ADJUSTED", "symbol": ticker,
+             "outputsize": "compact", "datatype": "csv"},
+            api_key, csv_all_rows=True,
+        )
+        own_return = compute_21d_return(own_series)
+        rel_vs_spy = (
+            (own_return - spy_return_21d)
+            if (own_return is not None and spy_return_21d is not None)
+            else None
+        )
+        score, note = score_relative_strength(rel_vs_spy)
+        if sector_return_21d is not None and own_return is not None:
+            note += f" | vs {sector_etf_symbol} ({sector_return_21d:+.1f}%): {own_return - sector_return_21d:+.1f}pts"
+        rel_display = f"'{rel_vs_spy:+.2f}pts" if rel_vs_spy is not None else "N/A"
+        rows.append([
+            ticker, 11, "Relative Strength vs SPY (21-trading-day)",
+            f"{own_return:+.1f}%" if own_return is not None else "N/A",
+            f"{spy_return_21d:+.1f}%" if spy_return_21d is not None else "N/A",
+            "N/A", rel_display, today, "Sector/Relative Strength", score, note,
+            "Alpha Vantage: TIME_SERIES_DAILY_ADJUSTED",
+        ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} Relative Strength: {e}")
+
+    try:
         quote = av_request(
             {"function": "GLOBAL_QUOTE", "symbol": ticker, "datatype": "csv"}, api_key
         )
@@ -480,10 +558,40 @@ def main():
     client = gspread.authorize(creds)
     spreadsheet = client.open_by_key(os.environ["EQUITIES_SHEET_ID"])
 
+    print("\n--- Fetching shared market/sector benchmarks ---")
+    spy_series = av_request(
+        {"function": "TIME_SERIES_DAILY_ADJUSTED", "symbol": "SPY",
+         "outputsize": "compact", "datatype": "csv"},
+        api_key, csv_all_rows=True,
+    )
+    spy_return_21d = compute_21d_return(spy_series)
+    print(f"[OK] SPY 21-day return: {spy_return_21d:+.2f}%"
+          if spy_return_21d is not None else "[FAIL] SPY return unavailable")
+
+    sector_return_cache = {}
+    unique_etfs = sorted({etf for etf in SECTOR_ETF_MAP.values() if etf})
+    for etf in unique_etfs:
+        try:
+            series = av_request(
+                {"function": "TIME_SERIES_DAILY_ADJUSTED", "symbol": etf,
+                 "outputsize": "compact", "datatype": "csv"},
+                api_key, csv_all_rows=True,
+            )
+            sector_return_cache[etf] = compute_21d_return(series)
+            print(f"[OK] {etf} 21-day return: {sector_return_cache[etf]:+.2f}%"
+                  if sector_return_cache[etf] is not None else f"[FAIL] {etf} return unavailable")
+        except Exception as e:
+            print(f"[FAIL] {etf} sector benchmark fetch: {e}")
+            sector_return_cache[etf] = None
+
     all_rows = []
     for ticker in WATCHLIST:
         print(f"\n--- Fetching {ticker} ---")
-        all_rows.extend(fetch_ticker_data(ticker, api_key))
+        sector_etf = SECTOR_ETF_MAP.get(ticker)
+        sector_return = sector_return_cache.get(sector_etf) if sector_etf else None
+        all_rows.extend(
+            fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return, sector_etf)
+        )
         time.sleep(1)
 
     write_rows(spreadsheet, all_rows)
