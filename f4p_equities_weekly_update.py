@@ -510,10 +510,11 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
         if sector_return_21d is not None and own_return is not None:
             note += f" | vs {sector_etf_symbol} ({sector_return_21d:+.1f}%): {own_return - sector_return_21d:+.1f}pts"
         rel_display = f"'{rel_vs_spy:+.2f}pts" if rel_vs_spy is not None else "N/A"
+        own_display = f"'{own_return:+.1f}%" if own_return is not None else "N/A"
+        spy_display = f"'{spy_return_21d:+.1f}%" if spy_return_21d is not None else "N/A"
         rows.append([
             ticker, 11, "Relative Strength vs SPY (21-trading-day)",
-            f"{own_return:+.1f}%" if own_return is not None else "N/A",
-            f"{spy_return_21d:+.1f}%" if spy_return_21d is not None else "N/A",
+            own_display, spy_display,
             "N/A", rel_display, today, "Sector/Relative Strength", score, note,
             "Alpha Vantage: TIME_SERIES_DAILY_ADJUSTED",
         ])
