@@ -335,6 +335,16 @@ def fetch_ticker_data(ticker, api_key):
                 "Endogenous", 0, "N/A - no income statement data",
                 "Alpha Vantage: INCOME_STATEMENT",
             ])
+            rows.append([
+                ticker, 3, "Gross Margin Trend (QoQ, cost mix)", "N/A", "N/A", "N/A", "N/A",
+                today, "Endogenous", 0, "N/A - no income statement data",
+                "Alpha Vantage: INCOME_STATEMENT",
+            ])
+            rows.append([
+                ticker, 5, "Operating Margin Trend (YoY, opex leverage)", "N/A", "N/A", "N/A", "N/A",
+                today, "Endogenous", 0, "N/A - no income statement data",
+                "Alpha Vantage: INCOME_STATEMENT",
+            ])
     except Exception as e:
         print(f"[FAIL] {ticker} Revenue Surprise / Margin Trend: {e}")
 
