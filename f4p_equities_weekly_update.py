@@ -42,6 +42,12 @@ Also populates the EARNINGS CALENDAR tab (next report date, timing,
 consensus EPS estimate, days to event) - this is the raw data behind
 the "Catalyst" column in STRATEGY DASHBOARD.
 
+Also appends weekly ATM IV snapshots to OPTIONS FLOW & IV (accumulating
+history toward a real IV Rank later - see that tab's own notes). This
+one is heavy: HISTORICAL_OPTIONS returns the entire chain across all
+expirations (confirmed 128,000+ tokens for a single ticker on
+2026-08-25), so this run will be noticeably slower than prior ones.
+
 Note: indicators 3 and 5 look similar at a glance (both "margin trend") but
 measure genuinely different things - verified against NVDA's actual filed
 numbers on 2026-08-25 after a discrepancy was flagged and traced by hand.
@@ -278,6 +284,67 @@ def compute_21d_return(daily_rows):
         return (recent - prior) / prior * 100
     except (KeyError, ValueError, TypeError):
         return None
+
+
+def get_atm_iv(ticker, current_price, api_key):
+    """Finds the nearest-to-spot strike within the nearest expiration
+    that's at least 14 days out (avoiding weeklies skewed by imminent
+    events), and returns the average call+put implied volatility at
+    that strike. Returns (iv, expiration, strike) - any of which may
+    be None if unavailable."""
+    try:
+        chain = av_request({"function": "HISTORICAL_OPTIONS", "symbol": ticker}, api_key)
+        contracts = chain.get("data") or []
+        if not contracts or current_price is None:
+            return None, None, None
+
+        today_date = time.strftime("%Y-%m-%d")
+        candidate_expirations = sorted({c["expiration"] for c in contracts if c.get("expiration")})
+        chosen_exp = None
+        for exp in candidate_expirations:
+            try:
+                days_out = (
+                    time.mktime(time.strptime(exp, "%Y-%m-%d"))
+                    - time.mktime(time.strptime(today_date, "%Y-%m-%d"))
+                ) / 86400
+            except ValueError:
+                continue
+            if days_out >= 14:
+                chosen_exp = exp
+                break
+        if chosen_exp is None and candidate_expirations:
+            chosen_exp = candidate_expirations[-1]
+        if chosen_exp is None:
+            return None, None, None
+
+        exp_contracts = [c for c in contracts if c.get("expiration") == chosen_exp]
+
+        def strike_diff(c):
+            try:
+                return abs(float(c.get("strike", 0)) - current_price)
+            except (ValueError, TypeError):
+                return float("inf")
+
+        exp_contracts.sort(key=strike_diff)
+        if not exp_contracts:
+            return None, chosen_exp, None
+        nearest_strike = exp_contracts[0].get("strike")
+
+        ivs = []
+        for c in exp_contracts:
+            if c.get("strike") == nearest_strike:
+                try:
+                    iv = float(c.get("implied_volatility"))
+                    if iv > 0:
+                        ivs.append(iv)
+                except (ValueError, TypeError):
+                    continue
+        if not ivs:
+            return None, chosen_exp, nearest_strike
+        return sum(ivs) / len(ivs), chosen_exp, nearest_strike
+    except Exception as e:
+        print(f"[FAIL] {ticker} ATM IV calc: {e}")
+        return None, None, None
 
 
 def get_or_fetch_mfi(symbol, mfi_cache, api_key):
@@ -856,6 +923,35 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     except Exception as e:
         print(f"[FAIL] {ticker} Earnings Calendar: {e}")
 
+    iv_snapshot_row = None
+    try:
+        quote_for_iv = av_request(
+            {"function": "GLOBAL_QUOTE", "symbol": ticker, "datatype": "csv"}, api_key
+        )
+        current_price = None
+        raw_price = quote_for_iv.get("price")
+        if raw_price:
+            try:
+                current_price = float(raw_price)
+            except (ValueError, TypeError):
+                current_price = None
+
+        atm_iv, chosen_exp, nearest_strike = get_atm_iv(ticker, current_price, api_key)
+        if atm_iv is not None:
+            iv_snapshot_row = [
+                today, ticker, f"{atm_iv * 100:.2f}%",
+                chosen_exp or "N/A", nearest_strike or "N/A",
+                "Snapshot only - accumulating weekly history for future IV Rank calc",
+            ]
+        else:
+            iv_snapshot_row = [
+                today, ticker, "N/A", chosen_exp or "N/A", nearest_strike or "N/A",
+                "N/A - could not resolve an ATM contract this run",
+            ]
+    except Exception as e:
+        print(f"[FAIL] {ticker} ATM IV Snapshot: {e}")
+        iv_snapshot_row = [today, ticker, "N/A", "N/A", "N/A", f"N/A - fetch error: {e}"]
+
     try:
         quote = av_request(
             {"function": "GLOBAL_QUOTE", "symbol": ticker, "datatype": "csv"}, api_key
@@ -874,7 +970,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     except Exception as e:
         print(f"[FAIL] {ticker} Price Momentum: {e}")
 
-    return rows, earnings_calendar_row
+    return rows, earnings_calendar_row, iv_snapshot_row
 
 
 def write_rows(spreadsheet, all_rows):
@@ -895,6 +991,30 @@ def write_calendar_rows(spreadsheet, calendar_rows):
     if calendar_rows:
         ws.update("A2", calendar_rows, raw=False)
     print(f"[OK] Wrote {len(calendar_rows)} rows to EARNINGS CALENDAR")
+
+
+def write_iv_snapshot_rows(spreadsheet, iv_rows):
+    """Appends this week's IV snapshots rather than overwriting - the
+    whole point is accumulating history over time to eventually compute
+    a real IV Rank, not a fresh-each-run data dump like the other tabs.
+
+    Repurposes this tab's original columns (Put/Call Ratio, Insider
+    Activity, etc.) since those now live properly in EQUITIES HUB DATA
+    indicators 15 and 16 - this tab was never populated under that old
+    design."""
+    ws = spreadsheet.worksheet("OPTIONS FLOW & IV")
+    expected_headers = ["Date", "Ticker", "ATM IV", "Expiration Used", "Strike Used", "Notes"]
+    existing = ws.get_all_values()
+    if not existing or existing[0][:6] != expected_headers:
+        ws.update("A1", [expected_headers], raw=False)
+        ws.format("A1:F1", {
+            "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
+            "backgroundColor": {"red": 0.09, "green": 0.13, "blue": 0.18},
+        })
+        ws.freeze(rows=1)
+    if iv_rows:
+        ws.append_rows(iv_rows, value_input_option="USER_ENTERED")
+    print(f"[OK] Appended {len(iv_rows)} IV snapshot rows to OPTIONS FLOW & IV (accumulating history)")
 
 
 def main():
@@ -932,6 +1052,7 @@ def main():
 
     all_rows = []
     all_calendar_rows = []
+    all_iv_rows = []
     series_cache = {}  # shared across all tickers - avoids re-fetching GOOGL/META
                         # twice since they're each other's peer
     mfi_cache = {}      # shared across tickers with the same sector ETF
@@ -940,17 +1061,20 @@ def main():
         sector_etf = SECTOR_ETF_MAP.get(ticker)
         sector_return = sector_return_cache.get(sector_etf) if sector_etf else None
         peer_ticker = PEER_MAP.get(ticker)
-        ticker_rows, calendar_row = fetch_ticker_data(
+        ticker_rows, calendar_row, iv_row = fetch_ticker_data(
             ticker, api_key, spy_return_21d, sector_return, sector_etf,
             peer_ticker, series_cache, mfi_cache,
         )
         all_rows.extend(ticker_rows)
         if calendar_row:
             all_calendar_rows.append(calendar_row)
+        if iv_row:
+            all_iv_rows.append(iv_row)
         time.sleep(1)
 
     write_rows(spreadsheet, all_rows)
     write_calendar_rows(spreadsheet, all_calendar_rows)
+    write_iv_snapshot_rows(spreadsheet, all_iv_rows)
     print(f"\nDone. {len(all_rows)} total indicator rows across {len(WATCHLIST)} tickers.")
 
 
