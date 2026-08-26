@@ -398,7 +398,16 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
 
     try:
         earnings = av_request({"function": "EARNINGS", "symbol": ticker}, api_key)
-        latest_q = (earnings.get("quarterlyEarnings") or [{}])[0]
+        raw_reports = earnings.get("quarterlyEarnings") or []
+        if not raw_reports:
+            # TEMPORARY DIAGNOSTIC - a well-known large-cap ticker returning
+            # zero quarterly earnings is suspicious, not necessarily genuine.
+            # Log the raw response so the next run tells us definitively
+            # whether this is real emptiness or a disguised rate-limit.
+            print(f"[SUSPICIOUS EMPTY] {ticker} EARNINGS returned no "
+                  f"quarterlyEarnings. Raw response keys: {list(earnings.keys())}. "
+                  f"Full response: {earnings}")
+        latest_q = raw_reports[0] if raw_reports else {}
         raw_surprise = latest_q.get("surprisePercentage")
         surprise_pct = float(raw_surprise) if raw_surprise not in (None, "None") else None
         score, note = score_eps_surprise(surprise_pct)
@@ -453,6 +462,10 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     try:
         income = av_request({"function": "INCOME_STATEMENT", "symbol": ticker}, api_key)
         q_reports = income.get("quarterlyReports") or []
+        if not q_reports:
+            print(f"[SUSPICIOUS EMPTY] {ticker} INCOME_STATEMENT returned no "
+                  f"quarterlyReports. Raw response keys: {list(income.keys())}. "
+                  f"Full response: {income}")
         if q_reports:
             latest_q_report = q_reports[0]
             actual_revenue = latest_q_report.get("totalRevenue")
@@ -546,6 +559,10 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     try:
         cash_flow = av_request({"function": "CASH_FLOW", "symbol": ticker}, api_key)
         cf_reports = cash_flow.get("quarterlyReports") or []
+        if not cf_reports:
+            print(f"[SUSPICIOUS EMPTY] {ticker} CASH_FLOW returned no "
+                  f"quarterlyReports. Raw response keys: {list(cash_flow.keys())}. "
+                  f"Full response: {cash_flow}")
         fcf = None
         fcf_margin = None
         if cf_reports:
@@ -573,6 +590,10 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     try:
         balance = av_request({"function": "BALANCE_SHEET", "symbol": ticker}, api_key)
         bs_reports = balance.get("quarterlyReports") or []
+        if not bs_reports:
+            print(f"[SUSPICIOUS EMPTY] {ticker} BALANCE_SHEET returned no "
+                  f"quarterlyReports. Raw response keys: {list(balance.keys())}. "
+                  f"Full response: {balance}")
         current_ratio = None
         debt_to_equity = None
         if bs_reports:
