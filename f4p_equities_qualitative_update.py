@@ -73,6 +73,7 @@ Respond with exactly this JSON structure and nothing else. Do not truncate with 
 
 def get_qualitative_data(ticker, client):
     """Calls Claude with web search, returns the parsed dict or None on failure."""
+    text = ""
     try:
         response = client.messages.create(
             model=MODEL,
@@ -82,12 +83,21 @@ def get_qualitative_data(ticker, client):
         )
         # Concatenate all text blocks - web search responses can span multiple blocks
         text = "".join(block.text for block in response.content if block.type == "text")
-        cleaned = text.strip()
-        if cleaned.startswith("```"):
-            cleaned = cleaned.split("```")[1]
-            if cleaned.startswith("json"):
-                cleaned = cleaned[4:]
-        return json.loads(cleaned.strip())
+
+        # Claude sometimes adds a lead-in sentence before the JSON despite
+        # explicit instructions not to - confirmed happening for COIN on
+        # 2026-08-27 ("Now I have enough info to compile the final
+        # answer." prefixed the actual JSON object, which made json.loads
+        # fail immediately at char 0). Extract the {...} span directly
+        # instead of assuming the whole response is clean JSON - this
+        # handles a leading/trailing sentence with or without markdown
+        # fences also being present.
+        start = text.find("{")
+        end = text.rfind("}")
+        if start == -1 or end == -1 or end < start:
+            print(f"[FAIL] {ticker} no JSON object found in response. Raw text: {text[:500]!r}")
+            return None
+        return json.loads(text[start:end + 1])
     except json.JSONDecodeError as e:
         print(f"[FAIL] {ticker} JSON parse error: {e}. Raw text: {text[:500]!r}")
         return None
