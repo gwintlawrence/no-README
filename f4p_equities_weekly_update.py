@@ -104,6 +104,25 @@ def av_request(params, api_key, retries=3, csv_all_rows=False):
         resp = requests.get(AV_BASE, params=query, timeout=30)
         resp.raise_for_status()
         if query.get("datatype") == "csv":
+            # Alpha Vantage sometimes returns a JSON error/rate-limit message
+            # even when CSV was requested. Confirmed happening on 2026-08-26:
+            # GLOBAL_QUOTE silently failed for all 9 tickers in one run because
+            # this path parsed the rate-limit message as if it were empty CSV
+            # instead of detecting and retrying it.
+            stripped = resp.text.lstrip()
+            if stripped.startswith("{"):
+                try:
+                    data = json.loads(resp.text)
+                except json.JSONDecodeError:
+                    data = {}
+                if "Note" in data or "Information" in data:
+                    print(f"[RATE LIMIT] {params.get('function')} (csv path) - "
+                          f"{data}. Retrying in 15s...")
+                    time.sleep(15)
+                    continue
+                raise RuntimeError(
+                    f"Unexpected JSON response for CSV-format request: {data}"
+                )
             reader = csv.DictReader(io.StringIO(resp.text))
             rows = list(reader)
             if csv_all_rows:
@@ -639,7 +658,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
             days_to_event = (
                 time.mktime(report_dt) - time.mktime(time.strptime(today, "%Y-%m-%d"))
             ) / 86400
-            timing = calendar.get("timeOfTheDay", "N/A")
+            timing = calendar.get("timeOfTheDay") or "timing not yet confirmed"
             estimate = calendar.get("estimate", "N/A")
             earnings_calendar_row = [
                 ticker,
@@ -648,6 +667,13 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
                 "N/A - not fiscal-quarter-matched, see Analyst Estimate Revisions row",
                 "N/A - see Revenue Surprise row in EQUITIES HUB DATA",
                 int(round(days_to_event)),
+            ]
+        else:
+            # No earnings found in the 3-month horizon - write this explicitly
+            # rather than silently dropping the ticker from the tab.
+            earnings_calendar_row = [
+                ticker, "N/A - no earnings scheduled in 3-month horizon",
+                "N/A", "N/A", "N/A", "N/A",
             ]
     except Exception as e:
         print(f"[FAIL] {ticker} Earnings Calendar: {e}")
