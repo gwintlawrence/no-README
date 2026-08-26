@@ -407,7 +407,14 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
             print(f"[SUSPICIOUS EMPTY] {ticker} EARNINGS returned no "
                   f"quarterlyEarnings. Raw response keys: {list(earnings.keys())}. "
                   f"Full response: {earnings}")
-        latest_q = raw_reports[0] if raw_reports else {}
+        # Skip any leading entry that hasn't actually been reported yet -
+        # confirmed happening for NVDA on 2026-08-26 (reports tonight):
+        # Alpha Vantage can place a pending quarter at index 0 with
+        # reportedEPS=null but estimatedEPS populated, right around
+        # earnings day. Taking index 0 blindly would silently show "no
+        # surprise" instead of falling through to the real latest report.
+        reported = [r for r in raw_reports if r.get("reportedEPS") not in (None, "None")]
+        latest_q = reported[0] if reported else {}
         raw_surprise = latest_q.get("surprisePercentage")
         surprise_pct = float(raw_surprise) if raw_surprise not in (None, "None") else None
         score, note = score_eps_surprise(surprise_pct)
@@ -419,9 +426,9 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
         surprise_display = f"'{surprise_pct:+.2f}%" if surprise_pct is not None else "N/A"
         rows.append([
             ticker, 1, "EPS Surprise",
-            latest_q.get("reportedEPS", "N/A"), latest_q.get("estimatedEPS", "N/A"),
+            latest_q.get("reportedEPS") or "N/A", latest_q.get("estimatedEPS") or "N/A",
             "N/A", surprise_display,
-            latest_q.get("reportedDate", "N/A"), "Endogenous", score, note,
+            latest_q.get("reportedDate") or "N/A", "Endogenous", score, note,
             "Alpha Vantage: EARNINGS",
         ])
     except Exception as e:
@@ -773,7 +780,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
                 time.mktime(report_dt) - time.mktime(time.strptime(today, "%Y-%m-%d"))
             ) / 86400
             timing = calendar.get("timeOfTheDay") or "timing not yet confirmed"
-            estimate = calendar.get("estimate", "N/A")
+            estimate = calendar.get("estimate") or "N/A"
             earnings_calendar_row = [
                 ticker,
                 f"{report_date} ({timing})",
@@ -804,7 +811,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
         change_display = f"'{raw_change}" if raw_change else "N/A"
         rows.append([
             ticker, 18, "Price Momentum Pulse (Phase 1 stand-in)",
-            quote.get("price", "N/A"), quote.get("previousClose", "N/A"), "N/A",
+            quote.get("price") or "N/A", quote.get("previousClose") or "N/A", "N/A",
             change_display, quote.get("latestDay", today),
             "Technical-Placeholder", score, note,
             "Alpha Vantage: GLOBAL_QUOTE",
