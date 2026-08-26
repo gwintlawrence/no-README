@@ -37,7 +37,7 @@ WATCHLIST = ["NVDA", "AAPL", "AMZN", "GOOGL", "TSLA", "META", "COIN", "NFLX", "Q
 # Must match the actual indicator count in f4p_equities_weekly_update.py.
 # Update this constant whenever a new indicator is added to that script -
 # otherwise every ticker will show as "INCOMPLETE" even when data is fine.
-EXPECTED_INDICATOR_COUNT = 12
+EXPECTED_INDICATOR_COUNT = 13
 
 HUB_TAB = "EQUITIES HUB DATA"
 
