@@ -1,0 +1,29 @@
+name: F4P Equities Qualitative Update
+
+# Deliberately NO schedule trigger. This must run manually, AFTER
+# F4P Equities Weekly Update finishes each week - see the warning at
+# the top of f4p_equities_qualitative_update.py for why the order matters.
+on:
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install anthropic gspread google-auth
+
+      - run: python f4p_equities_qualitative_update.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+
+    
