@@ -5,8 +5,9 @@ Phase 1 of the F4P Equities & Options weekly pipeline.
 Pulls a field-verified subset of indicators directly from Alpha Vantage's
 REST API and writes flat +/-2 scored rows into the EQUITIES HUB DATA tab.
 
-Covers 14 of the planned 18-indicator framework - all with schemas
-confirmed live on 2026-08-25:
+Covers 17 of the planned 18-indicator framework - all with schemas
+confirmed live on 2026-08-25, plus indicators 6/7 (Forward Guidance,
+Catalyst Pipeline) added separately via f4p_equities_qualitative_update.py:
   1.  EPS Surprise                    (Company Endogenous)
   2.  Revenue Surprise                (Company Endogenous)
   3.  Gross Margin Trend              (Company Endogenous, QoQ, cost mix)
@@ -15,6 +16,12 @@ confirmed live on 2026-08-25:
   8.  Free Cash Flow Margin           (Company Endogenous, FCF/revenue)
   9.  Balance Sheet Quality           (Company Endogenous, current ratio +
                                         debt/equity context in notes)
+  10. IV / Historical Vol Spread      (Sector/Relative Strength - options-
+                                        pricing context, always scores 0
+                                        since it isn't stock-directional;
+                                        HV computed from the same daily
+                                        series already fetched for
+                                        indicator 11, no extra API call)
   11. Relative Strength vs SPY        (Sector/Relative Strength, 21-trading-day,
                                         adjusted close, sector ETF context in notes)
   12. Peer Relative Strength          (Sector/Relative Strength, 21-trading-day,
@@ -30,6 +37,11 @@ confirmed live on 2026-08-25:
                                         NOT honored server-side on 2026-08-25)
   18. Price Momentum Pulse            (Phase 1 stand-in for full Technical
                                         Setup - flagged in the Tag column)
+
+Only IV Rank (originally slot 17, now living as a weekly-accumulating
+snapshot log in OPTIONS FLOW & IV rather than a HUB DATA row) remains -
+it's time-gated, not code-gated: needs ~13 weeks of snapshots before a
+real percentile rank means anything.
 
 Indicators 8 and 9 map to two gaps identified against a coach-provided
 target framework (Anton's 15-indicator Endogenous scorecard, built with
@@ -286,6 +298,46 @@ def compute_21d_return(daily_rows):
         return None
 
 
+def compute_historical_volatility(daily_rows, window=21):
+    """Annualized historical volatility from daily log returns over the
+    trailing `window` trading days. Reuses the same adjusted-close series
+    already fetched for Relative Strength - no extra API call needed.
+    daily_rows must be ordered most-recent-first (Alpha Vantage default)."""
+    import math
+    if len(daily_rows) < window + 1:
+        return None
+    try:
+        closes = [float(r["adjusted_close"]) for r in daily_rows[:window + 1]]
+    except (KeyError, ValueError, TypeError):
+        return None
+    log_returns = []
+    for i in range(len(closes) - 1):
+        if closes[i] <= 0 or closes[i + 1] <= 0:
+            continue
+        log_returns.append(math.log(closes[i] / closes[i + 1]))
+    if len(log_returns) < 2:
+        return None
+    mean = sum(log_returns) / len(log_returns)
+    variance = sum((r - mean) ** 2 for r in log_returns) / (len(log_returns) - 1)
+    return (variance ** 0.5) * (252 ** 0.5)  # annualized
+
+
+def score_iv_hv_spread(iv, hv):
+    """IV/HV spread is an options-pricing signal, not a stock-direction
+    one - unlike everything else feeding Total Score, this doesn't
+    assert bullish or bearish. Scored 0 always (like Catalyst Pipeline)
+    so it informs STRATEGY DASHBOARD context without skewing Bias on a
+    metric that isn't actually directional."""
+    if iv is None or hv is None or hv == 0:
+        return 0, "N/A - insufficient data for IV/HV comparison"
+    ratio = iv / hv
+    if ratio >= 1.3:
+        return 0, f"IV/HV {ratio:.2f} - options pricing more vol than realized (premium-selling context)"
+    if ratio <= 0.7:
+        return 0, f"IV/HV {ratio:.2f} - options pricing less vol than realized (premium-buying context)"
+    return 0, f"IV/HV {ratio:.2f} - options roughly fairly priced vs realized volatility"
+
+
 def get_atm_iv(ticker, current_price, api_key):
     """Finds the nearest-to-spot strike within the nearest expiration
     that's at least 14 days out (avoiding weeklies skewed by imminent
@@ -368,10 +420,12 @@ def get_or_fetch_mfi(symbol, mfi_cache, api_key):
     return mfi
 
 
-def get_or_fetch_return(symbol, series_cache, api_key):
+def get_or_fetch_return(symbol, series_cache, api_key, raw_series_cache=None):
     """Returns the 21-day return for `symbol`, using a shared cache dict so
     a ticker that's both in the main watchlist AND someone else's peer
-    (GOOGL and META map to each other) only gets fetched once per run."""
+    (GOOGL and META map to each other) only gets fetched once per run.
+    Also stashes the raw daily series in raw_series_cache if provided,
+    so Historical Volatility can reuse it without a second API call."""
     if symbol in series_cache:
         return series_cache[symbol]
     try:
@@ -381,6 +435,8 @@ def get_or_fetch_return(symbol, series_cache, api_key):
             api_key, csv_all_rows=True,
         )
         ret = compute_21d_return(series)
+        if raw_series_cache is not None:
+            raw_series_cache[symbol] = series
     except Exception as e:
         print(f"[FAIL] {symbol} daily series fetch: {e}")
         ret = None
@@ -499,7 +555,7 @@ def score_momentum(change_pct):
 
 
 def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector_etf_symbol,
-                       peer_ticker, series_cache, mfi_cache):
+                       peer_ticker, series_cache, mfi_cache, raw_series_cache):
     rows = []
     today = time.strftime("%Y-%m-%d")
     revenue_for_ratios = None  # set below in Revenue Surprise block, reused by FCF margin
@@ -810,7 +866,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
         print(f"[FAIL] {ticker} Insider Activity: {e}")
 
     try:
-        own_return = get_or_fetch_return(ticker, series_cache, api_key)
+        own_return = get_or_fetch_return(ticker, series_cache, api_key, raw_series_cache)
         rel_vs_spy = (
             (own_return - spy_return_21d)
             if (own_return is not None and spy_return_21d is not None)
@@ -832,7 +888,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
         print(f"[FAIL] {ticker} Relative Strength: {e}")
 
     try:
-        own_return = get_or_fetch_return(ticker, series_cache, api_key)
+        own_return = get_or_fetch_return(ticker, series_cache, api_key, raw_series_cache)
         if peer_ticker is None:
             rows.append([
                 ticker, 12, "Peer Relative Strength (21-trading-day)",
@@ -841,7 +897,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
                 "Alpha Vantage: TIME_SERIES_DAILY_ADJUSTED",
             ])
         else:
-            peer_return = get_or_fetch_return(peer_ticker, series_cache, api_key)
+            peer_return = get_or_fetch_return(peer_ticker, series_cache, api_key, raw_series_cache)
             rel_vs_peer = (
                 (own_return - peer_return)
                 if (own_return is not None and peer_return is not None)
@@ -951,6 +1007,20 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     except Exception as e:
         print(f"[FAIL] {ticker} ATM IV Snapshot: {e}")
         iv_snapshot_row = [today, ticker, "N/A", "N/A", "N/A", f"N/A - fetch error: {e}"]
+        atm_iv = None
+
+    try:
+        hv = compute_historical_volatility(raw_series_cache.get(ticker, []))
+        score, note = score_iv_hv_spread(atm_iv, hv)
+        rows.append([
+            ticker, 10, "IV / Historical Vol Spread",
+            f"{atm_iv * 100:.2f}%" if atm_iv is not None else "N/A",
+            f"{hv * 100:.2f}%" if hv is not None else "N/A",
+            "N/A", "N/A", today, "Sector/Relative Strength", score, note,
+            "Alpha Vantage: HISTORICAL_OPTIONS + TIME_SERIES_DAILY_ADJUSTED",
+        ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} IV/HV Spread: {e}")
 
     try:
         quote = av_request(
@@ -1064,6 +1134,9 @@ def main():
     series_cache = {}  # shared across all tickers - avoids re-fetching GOOGL/META
                         # twice since they're each other's peer
     mfi_cache = {}      # shared across tickers with the same sector ETF
+    raw_series_cache = {}  # stores full daily series per symbol, for
+                            # Historical Volatility to reuse without a
+                            # second TIME_SERIES_DAILY_ADJUSTED call
     for ticker in WATCHLIST:
         print(f"\n--- Fetching {ticker} ---")
         sector_etf = SECTOR_ETF_MAP.get(ticker)
@@ -1071,7 +1144,7 @@ def main():
         peer_ticker = PEER_MAP.get(ticker)
         ticker_rows, calendar_row, iv_row = fetch_ticker_data(
             ticker, api_key, spy_return_21d, sector_return, sector_etf,
-            peer_ticker, series_cache, mfi_cache,
+            peer_ticker, series_cache, mfi_cache, raw_series_cache,
         )
         all_rows.extend(ticker_rows)
         if calendar_row:
