@@ -1,0 +1,53 @@
+name: F4P Equities Master Weekly Update
+
+# Runs all three weekly steps in the correct order, in one job, one click:
+#   1. f4p_equities_weekly_update.py    - Alpha Vantage data (17 indicators)
+#   2. f4p_equities_qualitative_update.py - Claude research (guidance/catalysts)
+#   3. setup_equity_rankings.py          - refresh the ranking formulas
+#
+# This replaces running those three workflows manually in sequence.
+# Scheduled for Saturday, same cadence as the FX Hub - see the note in
+# f4p_equities_weekly_update.yml about why its own schedule was removed
+# (this workflow now owns the schedule, to avoid double-running and
+# double API cost).
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 10 * * 6"  # Saturday 10:00 UTC - see f4p_equities_weekly_update.yml for the EST/EDT note
+
+jobs:
+  master_update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install gspread google-auth requests anthropic
+
+      - name: "Step 1 - Alpha Vantage data (17 indicators)"
+        run: python f4p_equities_weekly_update.py
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+
+      - name: "Step 2 - Claude research (Forward Guidance + Catalyst Pipeline)"
+        run: python f4p_equities_qualitative_update.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+
+      - name: "Step 3 - Refresh ranking formulas"
+        run: python setup_equity_rankings.py
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+
+    
