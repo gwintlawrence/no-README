@@ -46,10 +46,9 @@ Operating Margin Trend is year-over-year and reflects operating leverage
 are not redundant with each other despite the similar name.
 
 Still outstanding (Phase 3): forward guidance, catalyst pipeline,
-insider activity (endpoint returned repeated errors during testing -
-needs a fresh look), macro overlay (4 indicators - should cross-reference
-the FX Hub's existing tabs rather than re-fetch), sector/peer relative
-strength (3 indicators), IV rank, IV/HV spread. Forward guidance and
+peer relative strength, sector money-flow, macro overlay (4
+indicators - should cross-reference the FX Hub's existing tabs
+rather than re-fetch), IV rank, IV/HV spread. Forward guidance and
 catalyst pipeline need Claude for qualitative synthesis rather than a
 numeric threshold - different mechanism from everything else here.
 
@@ -384,7 +383,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
             rows.append([
                 ticker, 4, "Analyst Estimate Revisions (90-day)",
                 avg or "N/A", avg_90 or "N/A", "N/A", revision_display,
-                latest_est.get("date", today), "Endogenous", score, note,
+                today, "Endogenous", score, note + f" (for fiscal quarter ending {latest_est.get('date', 'N/A')})",
                 "Alpha Vantage: EARNINGS_ESTIMATES",
             ])
         else:
