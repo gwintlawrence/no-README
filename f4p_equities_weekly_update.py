@@ -752,7 +752,22 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
             api_key,
         )
         report_date = calendar.get("reportDate")
-        if report_date:
+        # Confirmed on 2026-08-26: under burst-rate-limit conditions this
+        # endpoint can return a malformed/truncated CSV that still parses
+        # "successfully" but with garbage values (e.g. reportDate == "f").
+        # Validate the shape before trusting it, rather than letting
+        # strptime raise and silently drop the ticker from the tab.
+        valid_date = (
+            report_date
+            and len(report_date) == 10
+            and report_date[4] == "-"
+            and report_date[7] == "-"
+            and report_date[:4].isdigit()
+        )
+        if report_date and not valid_date:
+            print(f"[SUSPICIOUS EMPTY] {ticker} EARNINGS_CALENDAR returned an "
+                  f"unparseable reportDate. Raw response: {calendar}")
+        if valid_date:
             report_dt = time.strptime(report_date, "%Y-%m-%d")
             days_to_event = (
                 time.mktime(report_dt) - time.mktime(time.strptime(today, "%Y-%m-%d"))
@@ -768,10 +783,12 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
                 int(round(days_to_event)),
             ]
         else:
-            # No earnings found in the 3-month horizon - write this explicitly
-            # rather than silently dropping the ticker from the tab.
+            # No earnings found in the horizon, OR the response was
+            # malformed - either way, write this explicitly rather than
+            # silently dropping the ticker from the tab.
             earnings_calendar_row = [
-                ticker, "N/A - no earnings scheduled in 3-month horizon",
+                ticker, "N/A - no earnings scheduled in 3-month horizon "
+                        "(or response was malformed - check logs)",
                 "N/A", "N/A", "N/A", "N/A",
             ]
     except Exception as e:
