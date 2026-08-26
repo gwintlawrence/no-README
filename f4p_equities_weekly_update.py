@@ -118,7 +118,7 @@ SECTOR_ETF_MAP = {
 PEER_MAP = {
     "NVDA": "AMD",
     "AAPL": "MSFT",
-    "AMZN": "WMT",
+    "AMZN": "MSFT",  # cloud/AWS angle, not retail - confirmed 2026-08-27
     "GOOGL": "META",
     "TSLA": "RIVN",
     "META": "GOOGL",
