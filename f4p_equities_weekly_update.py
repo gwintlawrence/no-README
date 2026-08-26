@@ -5,7 +5,7 @@ Phase 1 of the F4P Equities & Options weekly pipeline.
 Pulls a field-verified subset of indicators directly from Alpha Vantage's
 REST API and writes flat +/-2 scored rows into the EQUITIES HUB DATA tab.
 
-Covers 13 of the planned 18-indicator framework - all with schemas
+Covers 14 of the planned 18-indicator framework - all with schemas
 confirmed live on 2026-08-25:
   1.  EPS Surprise                    (Company Endogenous)
   2.  Revenue Surprise                (Company Endogenous)
@@ -20,6 +20,8 @@ confirmed live on 2026-08-25:
   12. Peer Relative Strength          (Sector/Relative Strength, 21-trading-day,
                                         single closest competitor per ticker -
                                         see PEER_MAP; QQQ has none by design)
+  13. Sector Money-Flow (MFI-14)      (Sector/Relative Strength, sector ETF's
+                                        Money Flow Index; QQQ uses its own MFI)
   14. Institutional Holdings Sentiment (Confirmation layer)
   15. Put/Call Ratio                  (Confirmation layer)
   16. Insider Activity                (Confirmation layer, 90-day, priced
@@ -278,6 +280,27 @@ def compute_21d_return(daily_rows):
         return None
 
 
+def get_or_fetch_mfi(symbol, mfi_cache, api_key):
+    """Returns the most recent MFI(14) reading for `symbol`, cached so
+    a sector ETF shared by multiple tickers (e.g. XLK for NVDA and AAPL)
+    only gets fetched once per run."""
+    if symbol in mfi_cache:
+        return mfi_cache[symbol]
+    try:
+        row = av_request(
+            {"function": "MFI", "symbol": symbol, "interval": "daily",
+             "time_period": 14, "datatype": "csv"},
+            api_key,
+        )
+        raw_mfi = row.get("MFI")
+        mfi = float(raw_mfi) if raw_mfi not in (None, "None") else None
+    except Exception as e:
+        print(f"[FAIL] {symbol} MFI fetch: {e}")
+        mfi = None
+    mfi_cache[symbol] = mfi
+    return mfi
+
+
 def get_or_fetch_return(symbol, series_cache, api_key):
     """Returns the 21-day return for `symbol`, using a shared cache dict so
     a ticker that's both in the main watchlist AND someone else's peer
@@ -296,6 +319,24 @@ def get_or_fetch_return(symbol, series_cache, api_key):
         ret = None
     series_cache[symbol] = ret
     return ret
+
+
+def score_sector_money_flow(mfi):
+    """MFI as a flow-confirmation signal, not a contrarian reversal
+    predictor - higher reading means more money flowing into the sector
+    right now, consistent with how Put/Call Ratio is scored elsewhere
+    in this framework."""
+    if mfi is None:
+        return 0, "N/A - insufficient data for MFI"
+    if mfi >= 70:
+        return 2, f"Strong money flow into sector: MFI {mfi:.1f}"
+    if mfi >= 55:
+        return 1, f"Positive money flow into sector: MFI {mfi:.1f}"
+    if mfi <= 30:
+        return -2, f"Strong money flow out of sector: MFI {mfi:.1f}"
+    if mfi <= 45:
+        return -1, f"Negative money flow out of sector: MFI {mfi:.1f}"
+    return 0, f"Neutral money flow: MFI {mfi:.1f}"
 
 
 def score_peer_relative_strength(rel_pct):
@@ -391,7 +432,7 @@ def score_momentum(change_pct):
 
 
 def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector_etf_symbol,
-                       peer_ticker, series_cache):
+                       peer_ticker, series_cache, mfi_cache):
     rows = []
     today = time.strftime("%Y-%m-%d")
     revenue_for_ratios = None  # set below in Revenue Surprise block, reused by FCF margin
@@ -752,6 +793,20 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     except Exception as e:
         print(f"[FAIL] {ticker} Peer Relative Strength: {e}")
 
+    try:
+        flow_symbol = sector_etf_symbol if sector_etf_symbol else ticker
+        mfi = get_or_fetch_mfi(flow_symbol, mfi_cache, api_key)
+        score, note = score_sector_money_flow(mfi)
+        note += f" (measured via {flow_symbol})"
+        rows.append([
+            ticker, 13, "Sector Money-Flow (MFI-14)",
+            f"{mfi:.1f}" if mfi is not None else "N/A",
+            "N/A", "N/A", "N/A", today, "Sector/Relative Strength", score, note,
+            "Alpha Vantage: MFI",
+        ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} Sector Money-Flow: {e}")
+
     earnings_calendar_row = None
     try:
         calendar = av_request(
@@ -879,6 +934,7 @@ def main():
     all_calendar_rows = []
     series_cache = {}  # shared across all tickers - avoids re-fetching GOOGL/META
                         # twice since they're each other's peer
+    mfi_cache = {}      # shared across tickers with the same sector ETF
     for ticker in WATCHLIST:
         print(f"\n--- Fetching {ticker} ---")
         sector_etf = SECTOR_ETF_MAP.get(ticker)
@@ -886,7 +942,7 @@ def main():
         peer_ticker = PEER_MAP.get(ticker)
         ticker_rows, calendar_row = fetch_ticker_data(
             ticker, api_key, spy_return_21d, sector_return, sector_etf,
-            peer_ticker, series_cache,
+            peer_ticker, series_cache, mfi_cache,
         )
         all_rows.extend(ticker_rows)
         if calendar_row:
