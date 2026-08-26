@@ -5,13 +5,16 @@ Phase 1 of the F4P Equities & Options weekly pipeline.
 Pulls a field-verified subset of indicators directly from Alpha Vantage's
 REST API and writes flat +/-2 scored rows into the EQUITIES HUB DATA tab.
 
-Covers 10 of the planned 18-indicator framework - all with schemas
+Covers 12 of the planned 18-indicator framework - all with schemas
 confirmed live on 2026-08-25:
   1.  EPS Surprise                    (Company Endogenous)
   2.  Revenue Surprise                (Company Endogenous)
   3.  Gross Margin Trend              (Company Endogenous, QoQ, cost mix)
   4.  Analyst Estimate Revisions      (Company Endogenous, 90-day)
   5.  Operating Margin Trend          (Company Endogenous, YoY, opex leverage)
+  8.  Free Cash Flow Margin           (Company Endogenous, FCF/revenue)
+  9.  Balance Sheet Quality           (Company Endogenous, current ratio +
+                                        debt/equity context in notes)
   11. Relative Strength vs SPY        (Sector/Relative Strength, 21-trading-day,
                                         adjusted close, sector ETF context in notes)
   14. Institutional Holdings Sentiment (Confirmation layer)
@@ -22,6 +25,13 @@ confirmed live on 2026-08-25:
                                         NOT honored server-side on 2026-08-25)
   18. Price Momentum Pulse            (Phase 1 stand-in for full Technical
                                         Setup - flagged in the Tag column)
+
+Indicators 8 and 9 map to two gaps identified against a coach-provided
+target framework (Anton's 15-indicator Endogenous scorecard, built with
+ChatGPT, shared 2026-08-25) - Free Cash Flow and Balance Sheet Quality.
+That framework is a target shape to build toward, not verified ground
+truth; its numbers have not been cross-checked against live data the
+way everything in this pipeline has been.
 
 Note: indicators 3 and 5 look similar at a glance (both "margin trend") but
 measure genuinely different things - verified against NVDA's actual filed
@@ -242,6 +252,34 @@ def score_relative_strength(rel_pct):
     return 0, f"Tracking SPY: {rel_pct:+.1f}pts over 21 trading days"
 
 
+def score_free_cash_flow(fcf_margin):
+    if fcf_margin is None:
+        return 0, "N/A - insufficient data for FCF margin"
+    if fcf_margin >= 30:
+        return 2, f"Very strong FCF generation: {fcf_margin:+.1f}% margin"
+    if fcf_margin >= 15:
+        return 1, f"Solid FCF generation: {fcf_margin:+.1f}% margin"
+    if fcf_margin <= -10:
+        return -2, f"Burning cash: {fcf_margin:+.1f}% FCF margin"
+    if fcf_margin < 5:
+        return -1, f"Weak FCF generation: {fcf_margin:+.1f}% margin"
+    return 0, f"Moderate FCF generation: {fcf_margin:+.1f}% margin"
+
+
+def score_balance_sheet_quality(current_ratio):
+    if current_ratio is None:
+        return 0, "N/A - insufficient balance sheet data"
+    if current_ratio >= 2.0:
+        return 2, f"Very strong liquidity: {current_ratio:.2f} current ratio"
+    if current_ratio >= 1.5:
+        return 1, f"Solid liquidity: {current_ratio:.2f} current ratio"
+    if current_ratio < 1.0:
+        return -2, f"Liquidity stress: {current_ratio:.2f} current ratio (below 1.0)"
+    if current_ratio < 1.2:
+        return -1, f"Thin liquidity cushion: {current_ratio:.2f} current ratio"
+    return 0, f"Adequate liquidity: {current_ratio:.2f} current ratio"
+
+
 def score_insider_activity(net_ratio):
     if net_ratio is None:
         return 0, "N/A - no priced insider transactions in 90-day window"
@@ -279,6 +317,7 @@ def score_momentum(change_pct):
 def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector_etf_symbol):
     rows = []
     today = time.strftime("%Y-%m-%d")
+    revenue_for_ratios = None  # set below in Revenue Surprise block, reused by FCF margin
 
     try:
         earnings = av_request({"function": "EARNINGS", "symbol": ticker}, api_key)
@@ -341,6 +380,11 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
             latest_q_report = q_reports[0]
             actual_revenue = latest_q_report.get("totalRevenue")
             fiscal_date = latest_q_report.get("fiscalDateEnding")
+            if actual_revenue not in (None, "None"):
+                try:
+                    revenue_for_ratios = float(actual_revenue)
+                except (ValueError, TypeError):
+                    revenue_for_ratios = None
 
             est_match = next(
                 (e for e in (estimates.get("estimates") or [])
@@ -421,6 +465,64 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
             ])
     except Exception as e:
         print(f"[FAIL] {ticker} Revenue Surprise / Margin Trend: {e}")
+
+    try:
+        cash_flow = av_request({"function": "CASH_FLOW", "symbol": ticker}, api_key)
+        cf_reports = cash_flow.get("quarterlyReports") or []
+        fcf = None
+        fcf_margin = None
+        if cf_reports:
+            latest_cf = cf_reports[0]
+            try:
+                op_cf = float(latest_cf["operatingCashflow"])
+                capex = float(latest_cf["capitalExpenditures"])
+                fcf = op_cf - capex
+                if revenue_for_ratios:
+                    fcf_margin = fcf / revenue_for_ratios * 100
+            except (KeyError, ValueError, TypeError):
+                fcf = None
+        score, note = score_free_cash_flow(fcf_margin)
+        rows.append([
+            ticker, 8, "Free Cash Flow Margin",
+            f"${fcf:,.0f}" if fcf is not None else "N/A",
+            "N/A", "N/A",
+            f"'{fcf_margin:+.1f}%" if fcf_margin is not None else "N/A",
+            today, "Endogenous", score, note,
+            "Alpha Vantage: CASH_FLOW",
+        ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} Free Cash Flow: {e}")
+
+    try:
+        balance = av_request({"function": "BALANCE_SHEET", "symbol": ticker}, api_key)
+        bs_reports = balance.get("quarterlyReports") or []
+        current_ratio = None
+        debt_to_equity = None
+        if bs_reports:
+            latest_bs = bs_reports[0]
+            try:
+                current_assets = float(latest_bs["totalCurrentAssets"])
+                current_liabilities = float(latest_bs["totalCurrentLiabilities"])
+                if current_liabilities > 0:
+                    current_ratio = current_assets / current_liabilities
+                total_liabilities = float(latest_bs["totalLiabilities"])
+                total_equity = float(latest_bs["totalShareholderEquity"])
+                if total_equity > 0:
+                    debt_to_equity = total_liabilities / total_equity
+            except (KeyError, ValueError, TypeError):
+                current_ratio = None
+        score, note = score_balance_sheet_quality(current_ratio)
+        if debt_to_equity is not None:
+            note += f" | Debt/Equity: {debt_to_equity:.2f}"
+        rows.append([
+            ticker, 9, "Balance Sheet Quality (Current Ratio)",
+            f"{current_ratio:.2f}" if current_ratio is not None else "N/A",
+            "N/A", "N/A", "N/A",
+            today, "Endogenous", score, note,
+            "Alpha Vantage: BALANCE_SHEET",
+        ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} Balance Sheet Quality: {e}")
 
     try:
         holdings = av_request({"function": "INSTITUTIONAL_HOLDINGS", "symbol": ticker}, api_key)
