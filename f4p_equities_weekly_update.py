@@ -1005,7 +1005,15 @@ def write_iv_snapshot_rows(spreadsheet, iv_rows):
     ws = spreadsheet.worksheet("OPTIONS FLOW & IV")
     expected_headers = ["Date", "Ticker", "ATM IV", "Expiration Used", "Strike Used", "Notes"]
     existing = ws.get_all_values()
-    if not existing or existing[0][:6] != expected_headers:
+    has_stale_extra_columns = bool(existing) and len(existing[0]) > len(expected_headers)
+    header_needs_fix = (not existing) or (existing[0][:6] != expected_headers) or has_stale_extra_columns
+    if header_needs_fix:
+        # Clear the FULL header row first - a partial A1:F1 write leaves
+        # stale text in any columns from the tab's old 8-column design
+        # (confirmed happening: "Insider Activity" and "Notes" lingered
+        # in G1:H1 after the first run on 2026-08-26).
+        if has_stale_extra_columns:
+            ws.batch_clear([f"A1:{gspread.utils.rowcol_to_a1(1, len(existing[0]))}"])
         ws.update("A1", [expected_headers], raw=False)
         ws.format("A1:F1", {
             "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}},
