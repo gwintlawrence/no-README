@@ -33,6 +33,10 @@ That framework is a target shape to build toward, not verified ground
 truth; its numbers have not been cross-checked against live data the
 way everything in this pipeline has been.
 
+Also populates the EARNINGS CALENDAR tab (next report date, timing,
+consensus EPS estimate, days to event) - this is the raw data behind
+the "Catalyst" column in STRATEGY DASHBOARD.
+
 Note: indicators 3 and 5 look similar at a glance (both "margin trend") but
 measure genuinely different things - verified against NVDA's actual filed
 numbers on 2026-08-25 after a discrepancy was flagged and traced by hand.
@@ -623,6 +627,31 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     except Exception as e:
         print(f"[FAIL] {ticker} Relative Strength: {e}")
 
+    earnings_calendar_row = None
+    try:
+        calendar = av_request(
+            {"function": "EARNINGS_CALENDAR", "symbol": ticker, "datatype": "csv"},
+            api_key,
+        )
+        report_date = calendar.get("reportDate")
+        if report_date:
+            report_dt = time.strptime(report_date, "%Y-%m-%d")
+            days_to_event = (
+                time.mktime(report_dt) - time.mktime(time.strptime(today, "%Y-%m-%d"))
+            ) / 86400
+            timing = calendar.get("timeOfTheDay", "N/A")
+            estimate = calendar.get("estimate", "N/A")
+            earnings_calendar_row = [
+                ticker,
+                f"{report_date} ({timing})",
+                estimate,
+                "N/A - not fiscal-quarter-matched, see Analyst Estimate Revisions row",
+                "N/A - see Revenue Surprise row in EQUITIES HUB DATA",
+                int(round(days_to_event)),
+            ]
+    except Exception as e:
+        print(f"[FAIL] {ticker} Earnings Calendar: {e}")
+
     try:
         quote = av_request(
             {"function": "GLOBAL_QUOTE", "symbol": ticker, "datatype": "csv"}, api_key
@@ -641,7 +670,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
     except Exception as e:
         print(f"[FAIL] {ticker} Price Momentum: {e}")
 
-    return rows
+    return rows, earnings_calendar_row
 
 
 def write_rows(spreadsheet, all_rows):
@@ -652,6 +681,16 @@ def write_rows(spreadsheet, all_rows):
     if all_rows:
         ws.update("A2", all_rows, raw=False)
     print(f"[OK] Wrote {len(all_rows)} rows to EQUITIES HUB DATA")
+
+
+def write_calendar_rows(spreadsheet, calendar_rows):
+    ws = spreadsheet.worksheet("EARNINGS CALENDAR")
+    existing = ws.get_all_values()
+    if len(existing) > 1:
+        ws.batch_clear([f"A2:F{len(existing)}"])
+    if calendar_rows:
+        ws.update("A2", calendar_rows, raw=False)
+    print(f"[OK] Wrote {len(calendar_rows)} rows to EARNINGS CALENDAR")
 
 
 def main():
@@ -688,16 +727,21 @@ def main():
             sector_return_cache[etf] = None
 
     all_rows = []
+    all_calendar_rows = []
     for ticker in WATCHLIST:
         print(f"\n--- Fetching {ticker} ---")
         sector_etf = SECTOR_ETF_MAP.get(ticker)
         sector_return = sector_return_cache.get(sector_etf) if sector_etf else None
-        all_rows.extend(
-            fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return, sector_etf)
+        ticker_rows, calendar_row = fetch_ticker_data(
+            ticker, api_key, spy_return_21d, sector_return, sector_etf
         )
+        all_rows.extend(ticker_rows)
+        if calendar_row:
+            all_calendar_rows.append(calendar_row)
         time.sleep(1)
 
     write_rows(spreadsheet, all_rows)
+    write_calendar_rows(spreadsheet, all_calendar_rows)
     print(f"\nDone. {len(all_rows)} total indicator rows across {len(WATCHLIST)} tickers.")
 
 
