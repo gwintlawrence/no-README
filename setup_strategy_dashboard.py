@@ -53,9 +53,11 @@ def build_row_formulas(row_num):
     t = f"A{row_num}"
 
     catalyst = (
-        f'=IFERROR("Earnings "&VLOOKUP({t},\'{CALENDAR_TAB}\'!A:F,2,FALSE)'
-        f'&" - "&VLOOKUP({t},\'{CALENDAR_TAB}\'!A:F,6,FALSE)&"d away, est $"'
-        f'&VLOOKUP({t},\'{CALENDAR_TAB}\'!A:F,3,FALSE)&" EPS","No near-term earnings data")'
+        f'=IF(LEFT(VLOOKUP({t},\'{CALENDAR_TAB}\'!A:F,2,FALSE),3)="N/A",'
+        f'"No near-term earnings data",'
+        f'"Earnings "&VLOOKUP({t},\'{CALENDAR_TAB}\'!A:F,2,FALSE)&" - "'
+        f'&VLOOKUP({t},\'{CALENDAR_TAB}\'!A:F,6,FALSE)&"d away, est $"'
+        f'&VLOOKUP({t},\'{CALENDAR_TAB}\'!A:F,3,FALSE)&" EPS")'
     )
 
     technical_setup = (
