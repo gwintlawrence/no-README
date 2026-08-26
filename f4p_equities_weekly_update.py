@@ -5,7 +5,7 @@ Phase 1 of the F4P Equities & Options weekly pipeline.
 Pulls a field-verified subset of indicators directly from Alpha Vantage's
 REST API and writes flat +/-2 scored rows into the EQUITIES HUB DATA tab.
 
-Covers 12 of the planned 18-indicator framework - all with schemas
+Covers 13 of the planned 18-indicator framework - all with schemas
 confirmed live on 2026-08-25:
   1.  EPS Surprise                    (Company Endogenous)
   2.  Revenue Surprise                (Company Endogenous)
@@ -17,6 +17,9 @@ confirmed live on 2026-08-25:
                                         debt/equity context in notes)
   11. Relative Strength vs SPY        (Sector/Relative Strength, 21-trading-day,
                                         adjusted close, sector ETF context in notes)
+  12. Peer Relative Strength          (Sector/Relative Strength, 21-trading-day,
+                                        single closest competitor per ticker -
+                                        see PEER_MAP; QQQ has none by design)
   14. Institutional Holdings Sentiment (Confirmation layer)
   15. Put/Call Ratio                  (Confirmation layer)
   16. Insider Activity                (Confirmation layer, 90-day, priced
@@ -87,6 +90,21 @@ SECTOR_ETF_MAP = {
     "COIN": "XLF",   # Financials (closest GICS fit for a crypto exchange)
     "NFLX": "XLC",   # Communication Services
     "QQQ": None,
+}
+
+# Single closest direct competitor per ticker, for Peer Relative Strength.
+# GOOGL and META map to each other - the caching helper means fetching one
+# of their series serves both, no duplicate API call.
+PEER_MAP = {
+    "NVDA": "AMD",
+    "AAPL": "MSFT",
+    "AMZN": "WMT",
+    "GOOGL": "META",
+    "TSLA": "RIVN",
+    "META": "GOOGL",
+    "COIN": "HOOD",
+    "NFLX": "DIS",
+    "QQQ": None,  # index fund - no single-name peer makes sense
 }
 
 AV_BASE = "https://www.alphavantage.co/query"
@@ -260,6 +278,42 @@ def compute_21d_return(daily_rows):
         return None
 
 
+def get_or_fetch_return(symbol, series_cache, api_key):
+    """Returns the 21-day return for `symbol`, using a shared cache dict so
+    a ticker that's both in the main watchlist AND someone else's peer
+    (GOOGL and META map to each other) only gets fetched once per run."""
+    if symbol in series_cache:
+        return series_cache[symbol]
+    try:
+        series = av_request(
+            {"function": "TIME_SERIES_DAILY_ADJUSTED", "symbol": symbol,
+             "outputsize": "compact", "datatype": "csv"},
+            api_key, csv_all_rows=True,
+        )
+        ret = compute_21d_return(series)
+    except Exception as e:
+        print(f"[FAIL] {symbol} daily series fetch: {e}")
+        ret = None
+    series_cache[symbol] = ret
+    return ret
+
+
+def score_peer_relative_strength(rel_pct):
+    """Tighter thresholds than the SPY comparison - direct competitor
+    moves are a more concentrated signal than broad-market comparison."""
+    if rel_pct is None:
+        return 0, "N/A - insufficient price history"
+    if rel_pct >= 6:
+        return 2, f"Strong outperformance vs peer: {rel_pct:+.1f}pts over 21 trading days"
+    if rel_pct >= 2:
+        return 1, f"Mild outperformance vs peer: {rel_pct:+.1f}pts over 21 trading days"
+    if rel_pct <= -6:
+        return -2, f"Strong underperformance vs peer: {rel_pct:+.1f}pts over 21 trading days"
+    if rel_pct <= -2:
+        return -1, f"Mild underperformance vs peer: {rel_pct:+.1f}pts over 21 trading days"
+    return 0, f"Tracking peer: {rel_pct:+.1f}pts over 21 trading days"
+
+
 def score_relative_strength(rel_pct):
     if rel_pct is None:
         return 0, "N/A - insufficient price history"
@@ -336,7 +390,8 @@ def score_momentum(change_pct):
     return 0, f"Flat: {change_pct:+.2f}%"
 
 
-def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector_etf_symbol):
+def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector_etf_symbol,
+                       peer_ticker, series_cache):
     rows = []
     today = time.strftime("%Y-%m-%d")
     revenue_for_ratios = None  # set below in Revenue Surprise block, reused by FCF margin
@@ -619,12 +674,7 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
         print(f"[FAIL] {ticker} Insider Activity: {e}")
 
     try:
-        own_series = av_request(
-            {"function": "TIME_SERIES_DAILY_ADJUSTED", "symbol": ticker,
-             "outputsize": "compact", "datatype": "csv"},
-            api_key, csv_all_rows=True,
-        )
-        own_return = compute_21d_return(own_series)
+        own_return = get_or_fetch_return(ticker, series_cache, api_key)
         rel_vs_spy = (
             (own_return - spy_return_21d)
             if (own_return is not None and spy_return_21d is not None)
@@ -644,6 +694,35 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
         ])
     except Exception as e:
         print(f"[FAIL] {ticker} Relative Strength: {e}")
+
+    try:
+        own_return = get_or_fetch_return(ticker, series_cache, api_key)
+        if peer_ticker is None:
+            rows.append([
+                ticker, 12, "Peer Relative Strength (21-trading-day)",
+                "N/A", "N/A", "N/A", "N/A", today, "Sector/Relative Strength", 0,
+                "N/A - no single-name peer (index fund)",
+                "Alpha Vantage: TIME_SERIES_DAILY_ADJUSTED",
+            ])
+        else:
+            peer_return = get_or_fetch_return(peer_ticker, series_cache, api_key)
+            rel_vs_peer = (
+                (own_return - peer_return)
+                if (own_return is not None and peer_return is not None)
+                else None
+            )
+            score, note = score_peer_relative_strength(rel_vs_peer)
+            own_display = f"'{own_return:+.1f}%" if own_return is not None else "N/A"
+            peer_display = f"'{peer_return:+.1f}%" if peer_return is not None else "N/A"
+            rel_display = f"'{rel_vs_peer:+.2f}pts" if rel_vs_peer is not None else "N/A"
+            rows.append([
+                ticker, 12, f"Peer Relative Strength vs {peer_ticker} (21-trading-day)",
+                own_display, peer_display, "N/A", rel_display, today,
+                "Sector/Relative Strength", score, note,
+                "Alpha Vantage: TIME_SERIES_DAILY_ADJUSTED",
+            ])
+    except Exception as e:
+        print(f"[FAIL] {ticker} Peer Relative Strength: {e}")
 
     earnings_calendar_row = None
     try:
@@ -753,12 +832,16 @@ def main():
 
     all_rows = []
     all_calendar_rows = []
+    series_cache = {}  # shared across all tickers - avoids re-fetching GOOGL/META
+                        # twice since they're each other's peer
     for ticker in WATCHLIST:
         print(f"\n--- Fetching {ticker} ---")
         sector_etf = SECTOR_ETF_MAP.get(ticker)
         sector_return = sector_return_cache.get(sector_etf) if sector_etf else None
+        peer_ticker = PEER_MAP.get(ticker)
         ticker_rows, calendar_row = fetch_ticker_data(
-            ticker, api_key, spy_return_21d, sector_return, sector_etf
+            ticker, api_key, spy_return_21d, sector_return, sector_etf,
+            peer_ticker, series_cache,
         )
         all_rows.extend(ticker_rows)
         if calendar_row:
