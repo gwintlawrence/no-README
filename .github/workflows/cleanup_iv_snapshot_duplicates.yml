@@ -1,0 +1,27 @@
+name: Cleanup IV Snapshot Duplicates
+
+# One-time cleanup workflow. Run once to fix the 54-row duplicate bug
+# from 2026-08-26, then this can be ignored - the ongoing prevention
+# fix lives in f4p_equities_weekly_update.py itself.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install gspread google-auth
+
+      - run: python cleanup_iv_snapshot_duplicates.py
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+
+    
