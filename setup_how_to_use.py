@@ -22,10 +22,12 @@ SCOPES = [
 
 CONTENT = [
     ["Weekly Workflow",
-     "Saturday: automated data pull runs via GitHub Actions "
-     "(F4P Equities Weekly Update). Sunday: team reviews STRATEGY "
-     "DASHBOARD together, same as the FX Hub's Sunday scoring session. "
-     "Monday-Friday: execution."],
+     "Saturday 10:00 UTC: F4P Equities Master Weekly Update runs "
+     "automatically (Alpha Vantage data, Claude research, ranking "
+     "refresh, in that order, one workflow). Can also be triggered "
+     "manually anytime for a fresh read before a decision. Sunday: team "
+     "reviews STRATEGY DASHBOARD together, same as the FX Hub's Sunday "
+     "scoring session. Monday-Friday: execution."],
 
     ["Cardinal Rule (equities version)",
      "Fundamentals = Direction (Endogenous score in EQUITIES HUB DATA), "
@@ -46,32 +48,45 @@ CONTENT = [
      "Wait = mixed or insufficient confirmation - this is the most "
      "common state and is not a failure, it means the market hasn't "
      "lined up yet. Stop = confirms the opposite direction strongly. "
-     "INCOMPLETE (n/12) = a data row is missing somewhere - don't trust "
-     "the score until that's fixed, the same discipline that caught "
-     "three real bugs during setup."],
+     "INCOMPLETE (n/17) = a data row is missing somewhere - don't trust "
+     "the score until that's fixed. This guard has already caught real "
+     "gaps more than once - trust it over a green checkmark."],
 
     ["What's live vs. what's a placeholder",
-     "12 of 18 planned indicators are live and field-verified against "
-     "real filings as of 2026-08-25. Price Momentum Pulse is explicitly "
-     "a placeholder for full technical analysis (just daily % change), "
+     "17 of 18 planned indicators are live: 15 field-verified against "
+     "Alpha Vantage data, plus Forward Guidance and Catalyst Pipeline "
+     "via Claude web research. Price Momentum Pulse is explicitly a "
+     "placeholder for full technical analysis (just daily % change), "
      "flagged with a 'Technical-Placeholder' tag - don't weight it as "
-     "heavily as the other Confirmation-layer indicators."],
+     "heavily as the other Confirmation-layer indicators. Only IV Rank "
+     "remains - it's accumulating weekly ATM IV snapshots in OPTIONS "
+     "FLOW & IV, and needs roughly a year of history before a real "
+     "percentile means anything. That's a time constraint, not a "
+     "build constraint."],
 
     ["Known limitations",
-     "IV Rank isn't built yet - it needs weekly accumulated history "
-     "before a real percentile means anything, not a one-time pull. "
-     "Forward guidance and catalyst pipeline (qualitative reads on "
-     "earnings calls and news) aren't automated - they need a human or "
-     "a separate Claude-assisted step, not a numeric threshold. Macro "
-     "overlay isn't connected yet - check the FX Hub's CENTRAL BANK and "
-     "EXOGENOUS tabs directly for now."],
+     "Forward Guidance and Catalyst Pipeline are live research, not a "
+     "fixed API response - the same ticker can read slightly "
+     "differently between runs since Claude is re-researching current "
+     "news each time, not pulling a stored number. Give those two "
+     "indicators a bit more skepticism than the numeric ones. Macro "
+     "overlay is connected live to the FX Hub's FRED AUTO and CENTRAL "
+     "BANK tabs - check SECTOR & MACRO OVERLAY directly rather than "
+     "cross-referencing the FX Hub by hand. The Anthropic API used for "
+     "qualitative research bills every weekly run regardless of need - "
+     "worth an occasional glance at console.anthropic.com billing so a "
+     "low balance doesn't silently break that layer."],
 
     ["If something looks wrong",
      "Check the Source/Audit Link column in EQUITIES HUB DATA first - "
-     "every score traces back to a specific Alpha Vantage endpoint. If "
-     "a number still looks off, trace it by hand against the source "
-     "before trusting the score - that's exactly how the margin-trend "
-     "mislabel and the insider-transactions date bug got caught."],
+     "every score traces back to a specific Alpha Vantage or Claude "
+     "source. If a number still looks off, trace it by hand before "
+     "trusting the score. Also check the GitHub Actions run log for "
+     "lines starting with [FAIL] or [SUSPICIOUS EMPTY] - those flag "
+     "exactly what failed and why, rather than failing silently. That "
+     "discipline has already caught real bugs: a margin-trend mislabel, "
+     "an insider-transactions date bug, and a duplicate-row bug in the "
+     "IV snapshot log."],
 ]
 
 
