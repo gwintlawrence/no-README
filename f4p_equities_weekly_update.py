@@ -1,4 +1,4 @@
-    """
+"""
 f4p_equities_weekly_update.py
 
 Phase 1 of the F4P Equities & Options weekly pipeline.
