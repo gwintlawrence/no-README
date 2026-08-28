@@ -1,4 +1,4 @@
-"""
+    """
 f4p_equities_weekly_update.py
 
 Phase 1 of the F4P Equities & Options weekly pipeline.
@@ -1090,6 +1090,19 @@ def write_iv_snapshot_rows(spreadsheet, iv_rows):
             "backgroundColor": {"red": 0.09, "green": 0.13, "blue": 0.18},
         })
         ws.freeze(rows=1)
+    # Re-fetch fresh state - the header-fix block above may have already
+    # modified the sheet, so don't trust the earlier 'existing' snapshot.
+    current_rows = ws.get_all_values()
+    today = time.strftime("%Y-%m-%d")
+    rows_to_delete = [
+        i + 1 for i, row in enumerate(current_rows)
+        if len(row) > 0 and row[0] == today
+    ]
+    for row_num in reversed(rows_to_delete):
+        ws.delete_rows(row_num)
+    if rows_to_delete:
+        print(f"[OK] Removed {len(rows_to_delete)} existing row(s) for {today} before re-appending")
+
     if iv_rows:
         ws.append_rows(iv_rows, value_input_option="USER_ENTERED")
     print(f"[OK] Appended {len(iv_rows)} IV snapshot rows to OPTIONS FLOW & IV (accumulating history)")
