@@ -174,7 +174,15 @@ def append_qualitative_rows(spreadsheet, all_rows):
     """Appends rather than clears - this script runs second in the
     weekly sequence, adding to what f4p_equities_weekly_update.py just
     wrote. Removes any prior week's rows for indicators 6/7 first so
-    re-runs don't accumulate duplicates."""
+    re-runs don't accumulate duplicates.
+
+    Then VERIFIES the write actually persisted. Confirmed necessary on
+    2026-08-29: a run logged "Wrote 18 rows... Done" and reported
+    success, but the rows never actually appeared in the Sheet - every
+    ticker was missing indicators 6 and 7 entirely, silently, with no
+    error anywhere. That's worse than every other failure mode in this
+    pipeline, since those all showed up as a visible [FAIL] or a red X.
+    This makes a repeat of that impossible to miss."""
     ws = spreadsheet.worksheet("EQUITIES HUB DATA")
     existing = ws.get_all_values()
     rows_to_delete = [
@@ -185,8 +193,40 @@ def append_qualitative_rows(spreadsheet, all_rows):
         ws.delete_rows(row_num)
     if all_rows:
         ws.append_rows(all_rows, value_input_option="USER_ENTERED")
-    print(f"[OK] Wrote {len(all_rows)} qualitative rows (indicators 6 & 7) "
+    print(f"[OK] Appended {len(all_rows)} qualitative rows (indicators 6 & 7) "
           f"across {len(WATCHLIST)} tickers")
+
+    def find_missing():
+        verify_rows = ws.get_all_values()
+        missing = []
+        for ticker in WATCHLIST:
+            found_6 = any(len(r) > 1 and r[0] == ticker and r[1] == "6" for r in verify_rows)
+            found_7 = any(len(r) > 1 and r[0] == ticker and r[1] == "7" for r in verify_rows)
+            if not found_6:
+                missing.append(f"{ticker} indicator 6")
+            if not found_7:
+                missing.append(f"{ticker} indicator 7")
+        return missing
+
+    missing = find_missing()
+    if missing:
+        print(f"[VERIFY] {len(missing)} row(s) missing on first check - "
+              f"retrying once after 5s in case of a Sheets API propagation "
+              f"delay before treating this as a real failure...")
+        time.sleep(5)
+        missing = find_missing()
+
+    if missing:
+        print(f"[VERIFY FAILED] Still missing after retry: {missing}")
+        raise RuntimeError(
+            f"Verification failed: {len(missing)} expected row(s) missing after "
+            f"write and retry. The append call reported success but the data did "
+            f"not persist - exactly the failure mode caught on 2026-08-29. Check "
+            f"GOOGLE_CREDENTIALS permissions and Google Sheets API status before "
+            f"re-running."
+        )
+    print(f"[VERIFIED] All {len(WATCHLIST) * 2} qualitative rows confirmed "
+          f"actually present in the Sheet, not just reported as written")
 
 
 def main():
