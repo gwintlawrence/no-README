@@ -187,6 +187,74 @@ def extract_json_object(text: str) -> str:
     return text[start:]
 
 
+def repair_unescaped_quotes(text: str) -> str:
+    """
+    Fixes the specific failure mode that took down AUD's entire weekly batch:
+    Claude occasionally puts a literal, unescaped " inside a JSON string value
+    (e.g. quoting a central bank line directly in Institutional Analysis
+    despite the prompt telling it not to). json.loads() then either raises
+    on the extra token right after, or - worse - silently treats that quote
+    as the string's end, so the rest of the sentence becomes invalid JSON.
+
+    This walks the text the same way extract_json_object() does, tracking
+    string state, but for every quote found while inside a string it looks
+    ahead: if the next non-whitespace character is one that can legally
+    follow a real closing quote in JSON (`,`, `}`, `]`, `:`, or end of text),
+    treat it as a genuine closing quote. Otherwise it's a stray internal
+    quote - escape it in place and keep treating the rest of the sentence
+    as still inside that same string.
+
+    This is a cheap, deterministic first attempt - no API call, no cost -
+    tried before falling back to the existing fresh-call retry in
+    call_claude(), which does cost a full re-run of that batch's research.
+    """
+    LEGAL_AFTER_CLOSE = set(',}]:')
+    out = []
+    in_string = False
+    i = 0
+    n = len(text)
+
+    while i < n:
+        ch = text[i]
+
+        if ch == "\\" and in_string:
+            # An already-escaped character - copy both and skip past it
+            # untouched, don't second-guess existing valid escapes.
+            out.append(ch)
+            if i + 1 < n:
+                out.append(text[i + 1])
+            i += 2
+            continue
+
+        if ch == '"':
+            if not in_string:
+                in_string = True
+                out.append(ch)
+                i += 1
+                continue
+
+            # We're inside a string and hit a quote - is this the real
+            # closing quote, or a stray one Claude forgot to escape?
+            j = i + 1
+            while j < n and text[j] in " \t\n\r":
+                j += 1
+            next_char = text[j] if j < n else ""
+
+            if next_char in LEGAL_AFTER_CLOSE or next_char == "":
+                in_string = False
+                out.append(ch)
+            else:
+                # Stray internal quote - escape it and stay inside the string.
+                out.append('\\"')
+            i += 1
+            continue
+
+        out.append(ch)
+        i += 1
+
+    return "".join(out)
+
+
 def read_fred_auto_facts(spreadsheet) -> dict:
     """
     Reads the FRED AUTO tab - populated free, daily, by the separate
@@ -487,6 +555,20 @@ def call_claude(prompt: str, max_uses: int = 20, _json_retries: int = 2) -> dict
                   f"(cap was {max_uses})")
             return result
         except json.JSONDecodeError:
+            # Cheap deterministic repair attempt before paying for a whole
+            # fresh call - handles exactly the "stray literal quote inside a
+            # string value" case that took down AUD's batch.
+            repaired = repair_unescaped_quotes(json_candidate)
+            if repaired != json_candidate:
+                try:
+                    result = json.loads(repaired)
+                    print("[F4P Weekly Update] JSON parse failed on first pass but "
+                          "succeeded after repair_unescaped_quotes() - no retry needed.")
+                    print(f"[F4P Weekly Update] Call complete - total_searches_used={total_searches} "
+                          f"(cap was {max_uses})")
+                    return result
+                except json.JSONDecodeError:
+                    pass  # repair didn't fix it either - fall through to the retry below
             # This is the single most useful line in the whole log for diagnosing
             # a batch that goes stale on the sheet: if this prints, call_claude()
             # threw BEFORE the corresponding write_*() function ever ran, which
@@ -831,7 +913,3 @@ if __name__ == "__main__":
     except Exception as exc:
         print(f"[F4P Weekly Update] FAILED: {exc}", file=sys.stderr)
         sys.exit(1)
-
-    
-
-    
