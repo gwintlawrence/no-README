@@ -20,6 +20,13 @@ locally before deployment. Check a couple of tickers by hand against
 what EQUITY RANKINGS and EARNINGS CALENDAR already show before trusting
 this tab.
 
+SAFETY GUARD (added 2026-09-07): this is the legacy 8-column formula
+rebuild. phase1_engine_role_restructure.py replaces STRATEGY DASHBOARD
+with a 13-column separated-engine format whose header includes
+"Decision". If that column is present, Phase 1 has already run here -
+this script would silently clobber it back to the old format. main()
+aborts in that case rather than overwriting.
+
 Required secrets:
   GOOGLE_CREDENTIALS   - same service account used by the rest of the Hub
   EQUITIES_SHEET_ID    - F4P Equities & Options Scorecard file ID
@@ -99,6 +106,18 @@ def main():
     ws = spreadsheet.worksheet("STRATEGY DASHBOARD")
 
     existing = ws.get_all_values()
+
+    if existing and "Decision" in existing[0]:
+        raise SystemExit(
+            "[ABORT] STRATEGY DASHBOARD already has the Phase 1 header "
+            "('Decision' column found) - phase1_engine_role_restructure.py "
+            "has already rebuilt this tab. Running this legacy script would "
+            "silently overwrite that 13-column rebuild with the old "
+            "8-column formula format. Run phase1_engine_role_restructure.py "
+            "instead, or remove this guard only if you intend to revert to "
+            "the old format on purpose."
+        )
+
     if len(existing) > 1:
         ws.batch_clear([f"A2:H{len(existing)}"])
 
@@ -117,5 +136,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-    
