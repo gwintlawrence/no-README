@@ -142,6 +142,10 @@ def classify_hub_data(ws):
         print("[INFO] ENGINE / ROLE column already present — updating in place.")
     else:
         engine_col = len(header) + 1
+        if ws.col_count < engine_col:
+            ws.resize(rows=ws.row_count, cols=engine_col)
+            print(f"[INFO] Grid only had {ws.col_count} columns — resized to {engine_col} "
+                  f"to make room for ENGINE / ROLE.")
         ws.update_cell(1, engine_col, "ENGINE / ROLE")
         print(f"[INFO] Added ENGINE / ROLE column at position {engine_col}.")
 
@@ -296,6 +300,11 @@ def rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries):
             "",  # Decision Reason — manual
         ])
 
+    needed_cols = len(NEW_HEADERS)
+    if ws_dashboard.col_count < needed_cols:
+        ws_dashboard.resize(rows=max(ws_dashboard.row_count, len(new_rows)), cols=needed_cols)
+        print(f"[INFO] STRATEGY DASHBOARD grid only had {ws_dashboard.col_count} columns "
+              f"— resized to {needed_cols} for the new headers.")
     ws_dashboard.clear()
     ws_dashboard.update("A1", new_rows, value_input_option="RAW")
     print(f"[INFO] Rebuilt {STRATEGY_DASHBOARD_TAB} with {len(new_rows)-1} tickers, "
@@ -343,3 +352,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
