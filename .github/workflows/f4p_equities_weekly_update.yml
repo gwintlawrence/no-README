@@ -1,12 +1,15 @@
 name: F4P Equities Weekly Update
 
+# Manual-trigger only. The Saturday schedule lives in
+# f4p_equities_master_update.yml, which calls this script as Step 1 of 3
+# (Alpha Vantage data -> Claude research -> ranking refresh) in one run.
+# This file used to also carry its own Saturday cron, which caused
+# f4p_equities_weekly_update.py to run twice every Saturday - double
+# Alpha Vantage cost, two processes racing to write EQUITIES HUB DATA
+# at once. Removed 2026-09-07 - keep this dispatch-only.
+
 on:
   workflow_dispatch:
-  schedule:
-    # Saturday 6am ET data collection, same cadence as the FX pipeline.
-    # Cron is UTC - 10:00 UTC covers both EST (6am) and EDT (6am) close enough;
-    # adjust if daylight saving drift matters to you.
-    - cron: "0 10 * * 6"
 
 jobs:
   update:
@@ -25,5 +28,3 @@ jobs:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
-
-    
