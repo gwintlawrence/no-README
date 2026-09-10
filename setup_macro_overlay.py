@@ -47,6 +47,18 @@ def query_formula(tab, range_str, select_col, label_col, label_value):
     )
 
 
+def query_formula_contains(tab, range_str, select_col, label_col, label_substring):
+    """Same as query_formula(), but matches by substring instead of exact
+    equality. Needed for the per-currency Scorecard tabs (e.g. 'USD
+    Scorecard'), where the indicator label cell reads '3. Consumer
+    Sentiment' - a numbered prefix, not the bare indicator name - so an
+    exact match would never hit."""
+    return (
+        f'=QUERY(IMPORTRANGE("{FX_HUB_SHEET_ID}","{tab}!{range_str}"),'
+        f'"select {select_col} where {label_col} contains \'{label_substring}\'",0)'
+    )
+
+
 # Each row: (Indicator label, value formula, last-updated formula, source tab ref)
 MACRO_ROWS = [
     (
@@ -85,6 +97,29 @@ MACRO_ROWS = [
         "N/A",
         "FX Hub: CENTRAL BANK",
     ),
+    # --- Phase 2 additions: these three already exist as computed weekly
+    # indicators on USD's own Weekly Endogenous Scorecard tab (indicators
+    # 3, 5, and 4 respectively) - pulled from there rather than re-fetching
+    # from FRED a second time. Column layout on that tab: A=Indicator,
+    # B=Previous, C=Latest, D=Bias, E=Score, F=Source.
+    (
+        "Consumer Sentiment (UMCSI)",
+        query_formula_contains("USD Scorecard", "A:F", "Col3", "Col1", "Consumer Sentiment"),
+        "N/A",
+        "FX Hub: USD Scorecard (indicator 3)",
+    ),
+    (
+        "M2 Money Supply",
+        query_formula_contains("USD Scorecard", "A:F", "Col3", "Col1", "M2 Money Supply"),
+        "N/A",
+        "FX Hub: USD Scorecard (indicator 5)",
+    ),
+    (
+        "Building Permits / Housing",
+        query_formula_contains("USD Scorecard", "A:F", "Col3", "Col1", "Building Permits"),
+        "N/A",
+        "FX Hub: USD Scorecard (indicator 4)",
+    ),
 ]
 
 
@@ -111,5 +146,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
 
     
