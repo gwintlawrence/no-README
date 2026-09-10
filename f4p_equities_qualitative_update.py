@@ -140,7 +140,7 @@ def fetch_ticker_qualitative(ticker, client, today):
         rows.append([
             ticker, 7, "Catalyst Pipeline", "N/A", "N/A", "N/A", "N/A", today,
             "Endogenous", 0, "N/A - Claude call or JSON parse failed this run",
-            "Claude (web search)", "CONTEXT",
+            "Claude (web search)", "EXPECTATIONS",
         ])
         return rows
 
@@ -164,7 +164,7 @@ def fetch_ticker_qualitative(ticker, client, today):
         sources = "N/A"
     rows.append([
         ticker, 7, "Catalyst Pipeline", catalyst_text, "N/A", "N/A", "N/A", today,
-        "Endogenous", 0, catalyst_text, f"Claude (web search): {sources}", "CONTEXT",
+        "Endogenous", 0, catalyst_text, f"Claude (web search): {sources}", "EXPECTATIONS",
     ])
 
     return rows
