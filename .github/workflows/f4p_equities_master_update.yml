@@ -1,11 +1,22 @@
 name: F4P Equities Master Weekly Update
 
-# Runs all three weekly steps in the correct order, in one job, one click:
-#   1. f4p_equities_weekly_update.py    - Alpha Vantage data (17 indicators)
+# Runs all four weekly steps in the correct order, in one job, one click:
+#   1. f4p_equities_weekly_update.py      - Alpha Vantage data (17 indicators)
 #   2. f4p_equities_qualitative_update.py - Claude research (guidance/catalysts)
-#   3. setup_equity_rankings.py          - refresh the ranking formulas
+#   3. setup_equity_rankings.py           - refresh the ranking formulas
+#   4. phase1_engine_role_restructure.py  - ENGINE/ROLE classification +
+#                                            STRATEGY DASHBOARD rebuild
 #
-# This replaces running those three workflows manually in sequence.
+# Step 4 was previously a separate, manual-only workflow
+# (phase1_engine_role_restructure.yml) - confirmed on 2026-09-10 that
+# running it manually is not reliable: Step 2 rewrites indicators 6/7 fresh
+# every week and, on its own, only had the FUNDAMENTAL/EXPECTATIONS
+# classification baked into its own code - if Step 4 didn't happen to run
+# afterward that same week, the two scripts' classifications could
+# silently disagree. Running Step 4 every time, right after Step 3, closes
+# that gap for good.
+#
+# This replaces running those four workflows manually in sequence.
 # Scheduled for Saturday, same cadence as the FX Hub - see the note in
 # f4p_equities_weekly_update.yml about why its own schedule was removed
 # (this workflow now owns the schedule, to avoid double-running and
@@ -46,6 +57,12 @@ jobs:
 
       - name: "Step 3 - Refresh ranking formulas"
         run: python setup_equity_rankings.py
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+
+      - name: "Step 4 - ENGINE/ROLE classification + Strategy Dashboard rebuild"
+        run: python phase1_engine_role_restructure.py
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
