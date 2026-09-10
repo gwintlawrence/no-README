@@ -135,12 +135,12 @@ def fetch_ticker_qualitative(ticker, client, today):
         rows.append([
             ticker, 6, "Forward Guidance", "N/A", "N/A", "N/A", "N/A", today,
             "Endogenous", 0, "N/A - Claude call or JSON parse failed this run",
-            "Claude (web search)",
+            "Claude (web search)", "FUNDAMENTAL",
         ])
         rows.append([
             ticker, 7, "Catalyst Pipeline", "N/A", "N/A", "N/A", "N/A", today,
             "Endogenous", 0, "N/A - Claude call or JSON parse failed this run",
-            "Claude (web search)",
+            "Claude (web search)", "CONTEXT",
         ])
         return rows
 
@@ -150,7 +150,7 @@ def fetch_ticker_qualitative(ticker, client, today):
     source = data.get("guidance_source", "N/A") or "N/A"
     rows.append([
         ticker, 6, "Forward Guidance", direction, "N/A", "N/A", "N/A", today,
-        "Endogenous", score, summary, f"Claude (web search): {source}",
+        "Endogenous", score, summary, f"Claude (web search): {source}", "FUNDAMENTAL",
     ])
 
     catalysts = data.get("catalysts") or []
@@ -164,7 +164,7 @@ def fetch_ticker_qualitative(ticker, client, today):
         sources = "N/A"
     rows.append([
         ticker, 7, "Catalyst Pipeline", catalyst_text, "N/A", "N/A", "N/A", today,
-        "Endogenous", 0, catalyst_text, f"Claude (web search): {sources}",
+        "Endogenous", 0, catalyst_text, f"Claude (web search): {sources}", "CONTEXT",
     ])
 
     return rows
@@ -250,5 +250,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
 
     
