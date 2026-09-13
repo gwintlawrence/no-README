@@ -1,27 +1,30 @@
 """
-setup_vix_environment.py
+setup_vix_environment.py  (v2 - switched off INDEX_DATA)
 
 Phase 2 (Risk/Volatility Environment block) for the F4P Equities & Options Hub.
 
-Tracks VIX directly via Alpha Vantage INDEX_DATA - explicitly NOT VXX or
-any other volatility ETF/ETN. The VIX_Hedges reference material reviewed
-earlier is direct on this point: VXX and similar products are structurally
-destined to decay from contango and don't track the VIX index itself, so
-using one as a stand-in would misrepresent actual volatility conditions.
+v1 used Alpha Vantage's INDEX_DATA for VIX directly - that endpoint
+returned "You are not yet entitled to index data access" against the
+real key, confirmed 2026-09-12 (same failure as the Equity Regime
+script). FRED carries VIX too (series VIXCLS - "CBOE Volatility Index:
+VIX"), so this switches to the exact FRED fetch/lookback pattern
+already twice-proven today in setup_rates_environment.py and
+setup_credit_environment.py, rather than trying to fix Alpha Vantage
+entitlement for one series.
 
-Same untested-assumption caveat as setup_equity_regime.py: Alpha Vantage's
-INDEX_DATA response shape (assumed to match its standard time-series
-convention) could not be confirmed live before this was written - the
-premium entitlement needed wasn't available through the connector used
-while building this. Your ALPHA_VANTAGE_API_KEY is premium tier and
-should work; if not, send the actual output.
+Still explicitly NOT VXX or any volatility ETF/ETN - VIXCLS is the
+actual index level, which is the whole point per the VIX_Hedges
+reference material reviewed earlier.
 
-Vol-regime bands (Low/Normal/Elevated/High) use the standard, widely-cited
-VIX interpretation convention (roughly: <15 low, 15-20 normal, 20-30
-elevated, 30+ high/crisis) - not something invented for this script.
+Vol-regime bands (Low/Normal/Elevated/High) use the standard, widely-
+cited VIX interpretation convention (roughly: <15 low, 15-20 normal,
+20-30 elevated, 30+ high/crisis) - not something invented for this
+script.
 
 Required secrets:
-  ALPHA_VANTAGE_API_KEY, GOOGLE_CREDENTIALS, EQUITIES_SHEET_ID
+  FRED_API_KEY, GOOGLE_CREDENTIALS, EQUITIES_SHEET_ID
+  (FRED_API_KEY already in use by setup_rates_environment.py and
+  setup_credit_environment.py - no new secret needed)
 """
 
 import os
@@ -40,32 +43,21 @@ TAB_NAME = "VIX ENVIRONMENT"
 LOOKBACKS = [("WoW", 7), ("MoM", 30), ("QoQ", 91), ("YoY", 365)]
 
 
-def fetch_index_series(symbol):
+def fetch_fred_series(series_id):
     url = (
-        "https://www.alphavantage.co/query"
-        "?function=INDEX_DATA"
-        f"&symbol={symbol}&interval=daily&return_full_data=true"
-        "&apikey=" + os.environ["ALPHA_VANTAGE_API_KEY"]
+        "https://api.stlouisfed.org/fred/series/observations"
+        "?series_id=" + series_id +
+        "&api_key=" + os.environ["FRED_API_KEY"] +
+        "&sort_order=desc&limit=450&file_type=json"
     )
     resp = requests.get(url, timeout=30)
     resp.raise_for_status()
-    data = resp.json()
-
-    series_key = next((k for k in data if "Time Series" in k), None)
-    if series_key is None:
-        raise RuntimeError(
-            f"[FAIL] Unexpected INDEX_DATA response shape for {symbol}. "
-            f"Top-level keys were: {list(data.keys())}. Full response (first 500 chars): "
-            f"{json.dumps(data)[:500]}"
-        )
-
-    parsed = []
-    for date_str, values in data[series_key].items():
-        close_key = next((k for k in values if "close" in k.lower()), None)
-        if close_key:
-            parsed.append((datetime.date.fromisoformat(date_str), float(values[close_key])))
-    parsed.sort(key=lambda pair: pair[0], reverse=True)
-    return parsed
+    observations = resp.json().get("observations", [])
+    valid = [
+        (datetime.date.fromisoformat(o["date"]), float(o["value"]))
+        for o in observations if o["value"] != "."
+    ]
+    return valid
 
 
 def nearest_value(series, target_date, tolerance_days=5):
@@ -104,10 +96,10 @@ def main():
               "QoQ \u0394", "YoY \u0394", "As Of", "Source"]
 
     try:
-        series = fetch_index_series("VIX")
+        series = fetch_fred_series("VIXCLS")
         if not series:
             row = ["VIX (Cboe Volatility Index)", "N/A - Not Verified", "N/A",
-                   "N/A", "N/A", "N/A", "N/A", "N/A", "Alpha Vantage: INDEX_DATA (VIX) - no data returned"]
+                   "N/A", "N/A", "N/A", "N/A", "N/A", "FRED: VIXCLS - no data returned"]
         else:
             latest_date, latest_val = series[0]
             row = ["VIX (Cboe Volatility Index)", round(latest_val, 2), vol_regime_label(latest_val)]
@@ -116,18 +108,18 @@ def main():
                 prior_val = nearest_value(series, target)
                 row.append("N/A - Not Verified" if prior_val is None else round(latest_val - prior_val, 2))
             row.append(latest_date.isoformat())
-            row.append("Alpha Vantage: INDEX_DATA (VIX) - NOT VXX or any volatility ETF/ETN")
+            row.append("FRED: VIXCLS (https://fred.stlouisfed.org/series/VIXCLS) - NOT VXX or any volatility ETF/ETN")
         error = None
     except Exception as e:
         print(str(e))
-        row = ["VIX (Cboe Volatility Index)", "N/A - Not Verified"] + ["N/A"] * 7 + [f"ERROR: {e}"]
+        row = ["VIX (Cboe Volatility Index)", "N/A - Not Verified"] + ["N/A"] * 6 + [f"ERROR: {e}"]
         error = str(e)
 
     ws.clear()
     ws.update("A1", [header, row], raw=False)
     print(f"[OK] Wrote VIX row to '{TAB_NAME}'")
     if error:
-        print(f"[FAIL] VIX fetch failed - check API response shape: {error}")
+        print(f"[FAIL] VIX fetch failed: {error}")
 
 
 if __name__ == "__main__":
