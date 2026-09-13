@@ -22,7 +22,12 @@ What this does:
      logic, or portfolio/position-sizing formulas (explicitly out of scope
      for Phase 1-2).
   7. Writes "N/A" rather than fabricating wherever an engine has no data yet
-     (Market Environment, Expectations, Risk/Reward, Portfolio Fit).
+     (Expectations, Risk/Reward, Portfolio Fit).
+  8. Market Environment: reads the five Phase 2 environment tabs (SECTOR &
+     MACRO OVERLAY, RATES ENVIRONMENT, CREDIT ENVIRONMENT, EQUITY MARKET
+     REGIME, VIX ENVIRONMENT) and writes a qualitative synthesis
+     (Risk-On / Risk-Off / Mixed) — never a number, per the same
+     no-universal-score rule as Fundamental vs. Confirmation.
 
 What this does NOT do (by design — see build doc "STOP" instructions):
   - Does not build the Phase 2 Market Environment engine.
@@ -228,7 +233,92 @@ def compute_engine_summaries(per_ticker_rows):
     return summaries
 
 
-def rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries):
+def compute_market_environment_summary(sh):
+    """Phase 2 close-out: synthesizes the five environment tabs into one
+    qualitative read for STRATEGY DASHBOARD's Market Environment column.
+    Deliberately qualitative, not a number — per the build doc's rule
+    against creating a universal score across different analytical
+    engines, this never gets summed with Fundamental Predisposition or
+    anything else; it's its own field, same as Confirmation is.
+
+    Classification rule (this specific synthesis logic is new here, not
+    named anywhere in the build doc — flagged for Coach/Glenise review
+    same as the other judgment calls made during this build):
+      - Equity regime: Bull if both S&P and Nasdaq read Bull, Bear if
+        both read Bear, Mixed if they disagree.
+      - Vol: Calm if VIX regime is Low/Normal, Stressed if Elevated/High.
+      - Credit: Widening if the HY-IG spread moved wider on both WoW and
+        MoM (>+0.05, i.e. >5bps, to filter noise), Narrowing if both
+        moved tighter by the same margin, Stable otherwise.
+      - Curve: Normal if 2s10s > 0, Inverted otherwise (the classic
+        recession-signal reading).
+      - Overall: Risk-On only if equity=Bull AND vol=Calm AND credit is
+        not Widening AND curve is Normal. Risk-Off only if equity=Bear
+        AND vol=Stressed AND (credit Widening OR curve Inverted).
+        Everything else reads Mixed/Transitional — which is the most
+        common real-world case, not a fallback for missing data.
+
+    Fails soft (returns the old placeholder text) if any of the five
+    tabs is missing or unreadable, rather than crashing the whole
+    dashboard rebuild over one optional read.
+    """
+    try:
+        def col(header, name):
+            return header.index(name)
+
+        def get_rows(tab_name):
+            values = sh.worksheet(tab_name).get_all_values()
+            return values[0], values[1:]
+
+        regime_header, regime_rows = get_rows("EQUITY MARKET REGIME")
+        regimes = [r[col(regime_header, "Regime")] for r in regime_rows if r and r[0].strip()]
+        if len(regimes) >= 2 and all(r == "Bull" for r in regimes):
+            equity_signal = "Bull"
+        elif len(regimes) >= 2 and all(r == "Bear" for r in regimes):
+            equity_signal = "Bear"
+        else:
+            equity_signal = "Mixed"
+
+        vix_header, vix_rows = get_rows("VIX ENVIRONMENT")
+        vix_row = vix_rows[0]
+        vix_current = vix_row[col(vix_header, "Current")]
+        vol_regime = vix_row[col(vix_header, "Vol Regime")]
+        vol_signal = "Calm" if vol_regime in ("Low", "Normal") else "Stressed"
+
+        credit_header, credit_rows = get_rows("CREDIT ENVIRONMENT")
+        stress_row = next(r for r in credit_rows if r[0].startswith("HY minus IG"))
+        wow = float(stress_row[col(credit_header, "WoW \u0394")])
+        mom = float(stress_row[col(credit_header, "MoM \u0394")])
+        if wow > 0.05 and mom > 0.05:
+            credit_signal = "Widening"
+        elif wow < -0.05 and mom < -0.05:
+            credit_signal = "Narrowing"
+        else:
+            credit_signal = "Stable"
+
+        rates_header, rates_rows = get_rows("RATES ENVIRONMENT")
+        spread_row = next(r for r in rates_rows if r[0].startswith("2s10s"))
+        spread_current = float(spread_row[col(rates_header, "Current")])
+        curve_signal = "Normal" if spread_current > 0 else "Inverted"
+
+        if equity_signal == "Bull" and vol_signal == "Calm" and credit_signal != "Widening" and curve_signal == "Normal":
+            overall = "Risk-On"
+        elif equity_signal == "Bear" and vol_signal == "Stressed" and (credit_signal == "Widening" or curve_signal == "Inverted"):
+            overall = "Risk-Off"
+        else:
+            overall = "Mixed / Transitional"
+
+        return (f"{overall} \u2014 Equity regime: {equity_signal}; "
+                f"Vol: {vol_signal} (VIX {vix_current}); "
+                f"Credit: {credit_signal}; Curve: {curve_signal} "
+                f"(2s10s {spread_current:+.2f})")
+    except Exception as e:
+        print(f"[SUSPICIOUS EMPTY] Market Environment summary could not be computed: {e}. "
+              f"Writing placeholder instead of a guess.")
+        return "N/A - Not Verified (Market Environment tabs missing or unreadable)"
+
+
+def rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries, market_environment_text):
     """Phase 1, Section 5-7: separated-engine Strategy Dashboard.
     Preserves existing Catalyst / Instrument content where it maps cleanly;
     everything not yet built is written as an explicit N/A, never fabricated."""
@@ -286,7 +376,7 @@ def rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries):
 
         new_rows.append([
             ticker,
-            "N/A - Market Environment engine not yet built (Phase 2)",
+            market_environment_text,
             summary["fundamental_predisposition"],
             "N/A - no Expectations-layer indicator built yet",
             summary["confirmation_state"],
@@ -336,8 +426,19 @@ def main():
         sys.exit(1)
 
     try:
+        market_environment_text = compute_market_environment_summary(sh)
+        report["sections_run"].append("Market Environment summary (Phase 2 close-out)")
+    except Exception as e:
+        # compute_market_environment_summary already fails soft internally,
+        # so reaching here would be unexpected — but never let this one
+        # optional field take down the whole dashboard rebuild.
+        print(f"[FAIL] Market Environment summary: {e}")
+        report["sections_failed"].append(f"Market Environment summary: {e}")
+        market_environment_text = "N/A - Not Verified (Market Environment tabs missing or unreadable)"
+
+    try:
         ws_dashboard = sh.worksheet(STRATEGY_DASHBOARD_TAB)
-        rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries)
+        rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries, market_environment_text)
         report["sections_run"].append("STRATEGY DASHBOARD rebuild")
     except Exception as e:
         print(f"[FAIL] STRATEGY DASHBOARD rebuild: {e}")
@@ -352,5 +453,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
 
     
