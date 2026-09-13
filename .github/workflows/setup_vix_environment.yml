@@ -17,7 +17,7 @@ jobs:
 
       - run: python setup_vix_environment.py
         env:
-          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
 
