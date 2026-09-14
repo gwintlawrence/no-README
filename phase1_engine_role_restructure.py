@@ -321,7 +321,12 @@ def compute_market_environment_summary(sh):
 def rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries, market_environment_text):
     """Phase 1, Section 5-7: separated-engine Strategy Dashboard.
     Preserves existing Catalyst / Instrument content where it maps cleanly;
-    everything not yet built is written as an explicit N/A, never fabricated."""
+    everything not yet built is written as an explicit N/A, never fabricated.
+    Also preserves Capital Deployment / Decision / Decision Reason across
+    every rebuild -- these are manual fields the team sets (now including
+    directly through the interactive dashboard), and this function runs
+    every Saturday via the master workflow, so blanking them on every
+    automated run would silently erase a week's worth of real decisions."""
     NEW_HEADERS = [
         "Ticker", "Market Environment", "Fundamental Predisposition",
         "Expectations", "Confirmation", "Catalyst", "Capital Deployment",
@@ -338,6 +343,21 @@ def rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries, market_envir
     catalyst_i = old_col("Catalyst")
     instrument_i = old_col("Options Strategy Idea")
     ticker_i = old_col("Ticker")
+    capital_deployment_i = old_col("Capital Deployment")
+    decision_i = old_col("Decision")
+    decision_reason_i = old_col("Decision Reason")
+
+    def carry_forward(old_row, col_index):
+        """Manual fields (Capital Deployment, Decision, Decision Reason)
+        are set by the team, potentially through the interactive
+        dashboard, not by this script. Every previous version of this
+        function blanked them on every rebuild -- harmless when they
+        were never written anywhere, but a real weekly data-loss risk
+        once the dashboard can write to them directly. This preserves
+        whatever's already there instead of overwriting it with blank."""
+        if col_index is None or col_index >= len(old_row):
+            return ""
+        return old_row[col_index]
 
     old_by_ticker = {}
     for row in old_values[1:]:
@@ -381,13 +401,13 @@ def rebuild_strategy_dashboard(ws_dashboard, ws_hubdata, summaries, market_envir
             "N/A - no Expectations-layer indicator built yet",
             summary["confirmation_state"],
             catalyst,
-            "",  # Capital Deployment — manual: READY / WAIT / BROKEN
+            carry_forward(old_row, capital_deployment_i),  # Capital Deployment — manual, preserved across rebuilds
             volatility,
             instrument,
             "N/A - not yet built",   # Risk/Reward
             "N/A - not yet built",   # Portfolio Fit (explicitly out of scope)
-            "",  # Decision — manual: EXECUTE / WAIT / MONITOR / PASS
-            "",  # Decision Reason — manual
+            carry_forward(old_row, decision_i),             # Decision — manual, preserved across rebuilds
+            carry_forward(old_row, decision_reason_i),      # Decision Reason — manual, preserved across rebuilds
         ])
 
     needed_cols = len(NEW_HEADERS)
@@ -453,6 +473,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+    
 
     
 
