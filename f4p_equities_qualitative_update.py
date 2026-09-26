@@ -321,7 +321,7 @@ def write_catalyst_detail(spreadsheet, all_catalysts):
             c["ticker"], c["type"], c["description"], c["expected_date"],
             c["status"], c["source"],
         ])
-    ws.update("A1", rows_out)
+    ws.update(range_name="A1", values=rows_out)
     print(f"[OK] Wrote {len(all_catalysts)} structured catalyst rows to "
           f"THESIS WORKSPACE CATALYSTS")
 
