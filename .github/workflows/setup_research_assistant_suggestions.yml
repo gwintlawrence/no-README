@@ -1,0 +1,49 @@
+name: F4P Equities Research Assistant Suggestions (Phase 3)
+
+# Generates the weekly Research Assistant Suggestions - AI-organized
+# evidence commentary in its OWN tab (RESEARCH ASSISTANT SUGGESTIONS),
+# strictly separate from the official Human Thesis fields in THESIS
+# WORKSPACE, which this workflow never writes to.
+#
+# GOVERNANCE (Phase 3, approved by Glenise):
+#   - This is decision-support material, not a thesis. The output tab
+#     carries a standing banner saying so, and the prompt sent to Claude
+#     explicitly forbids a directional view, price target, recommendation,
+#     or Expectations Classification.
+#   - Batch-only, weekly, over the same Evidence Layer snapshot the rest
+#     of the Hub uses - no live/on-demand AI infrastructure, no web
+#     search, one Claude text call per ticker.
+#   - Every row carries Generated Date/Time and Evidence Through Date/Time,
+#     and a mechanically-detected (non-AI) Evidence Freshness Note, so
+#     stale or missing evidence is never presented as current.
+#
+# RUN ORDER: must run AFTER setup_thesis_workspace.py, since it reads the
+# Evidence Layer that script just wrote to THESIS WORKSPACE. Standalone/
+# workflow_dispatch here for manual runs and testing; also wired into
+# f4p_equities_master_update.yml so it always runs in the correct order.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  research_assistant_suggestions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install gspread google-auth anthropic
+
+      - name: "Generate Research Assistant Suggestions"
+        run: python setup_research_assistant_suggestions.py
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+
+    
