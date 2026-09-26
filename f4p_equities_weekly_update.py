@@ -35,8 +35,18 @@ Catalyst Pipeline) added separately via f4p_equities_qualitative_update.py:
                                         transactions only, client-side date
                                         filtered - from_date param confirmed
                                         NOT honored server-side on 2026-08-25)
-  18. Price Momentum Pulse            (Phase 1 stand-in for full Technical
-                                        Setup - flagged in the Tag column)
+  18. Technical Setup                 (Phase 2 - 20/50-day MA structure +
+                                        RSI-14, reusing the daily series
+                                        already fetched for indicator 11;
+                                        no extra API call. Replaces the
+                                        Phase 1 daily-%-change placeholder.
+                                        Tag column reads "Technicals/Timing";
+                                        its ENGINE/ROLE bucket in
+                                        phase1_engine_role_restructure.py
+                                        still needs Coach's sign-off since
+                                        it's no longer a flagged placeholder -
+                                        see the FLAG FOR COACH REVIEW comment
+                                        there.)
 
 Only IV Rank (originally slot 17, now living as a weekly-accumulating
 snapshot log in OPTIONS FLOW & IV rather than a HUB DATA row) remains -
@@ -536,22 +546,99 @@ def score_insider_activity(net_ratio):
     return 0, f"Balanced insider activity: net ratio {net_ratio:+.2f}"
 
 
-def score_momentum(change_pct):
-    """Temporary stand-in for full Technical Setup. A single day's change
-    is a weak proxy on its own - Phase 2 replaces this with MA structure
-    and RSI. Tagged 'Technical-Placeholder' so it's never confused for
-    the real Cardinal Rule technical layer."""
-    if change_pct is None:
-        return 0, "N/A - no quote data"
-    if change_pct >= 3:
-        return 2, f"Strong daily momentum: {change_pct:+.2f}%"
-    if change_pct >= 1:
-        return 1, f"Positive momentum: {change_pct:+.2f}%"
-    if change_pct <= -3:
-        return -2, f"Sharp daily weakness: {change_pct:+.2f}%"
-    if change_pct <= -1:
-        return -1, f"Negative momentum: {change_pct:+.2f}%"
-    return 0, f"Flat: {change_pct:+.2f}%"
+def compute_moving_averages(daily_rows):
+    """20-day and 50-day simple moving averages from adjusted-close daily
+    bars (most-recent-first, Alpha Vantage default order), plus the
+    20-day MA's value 10 trading days ago so the caller can read its
+    slope. Reuses the same daily series already fetched for Relative
+    Strength (raw_series_cache) - no extra API call needed. Returns
+    (sma20, sma50, sma20_10d_ago), or (None, None, None) if there isn't
+    enough history (needs 50 daily bars minimum - 'compact' outputsize
+    returns ~100, so this is comfortably covered once a ticker has any
+    real trading history)."""
+    if len(daily_rows) < 50:
+        return None, None, None
+    try:
+        closes = [float(r["adjusted_close"]) for r in daily_rows[:50]]
+    except (KeyError, ValueError, TypeError):
+        return None, None, None
+    sma20 = sum(closes[:20]) / 20
+    sma50 = sum(closes[:50]) / 50
+    sma20_10d_ago = sum(closes[10:30]) / 20
+    return sma20, sma50, sma20_10d_ago
+
+
+def compute_rsi(daily_rows, period=14):
+    """Simple (non-Wilder-smoothed) RSI over the trailing `period` daily
+    moves in adjusted close, most-recent-first. Reuses the same daily
+    series already fetched for Relative Strength/HV - no extra API call.
+    Returns None if there isn't enough history."""
+    if len(daily_rows) < period + 1:
+        return None
+    try:
+        closes = [float(r["adjusted_close"]) for r in daily_rows[:period + 1]]
+    except (KeyError, ValueError, TypeError):
+        return None
+    gains, losses = [], []
+    for i in range(len(closes) - 1):
+        change = closes[i] - closes[i + 1]  # most-recent-first: that day's move
+        if change >= 0:
+            gains.append(change)
+        else:
+            losses.append(-change)
+    avg_gain = sum(gains) / period
+    avg_loss = sum(losses) / period
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
+
+
+def score_technical_setup(current_price, sma20, sma50, sma20_10d_ago, rsi):
+    """Phase 2 Technical Setup: real 20/50-day MA structure plus RSI-14
+    context, replacing the Phase 1 daily-%-change placeholder. Scored on
+    the same +/-2 scale as the rest of the framework. Structure alone
+    sets the score; RSI never changes the number, it only adds an
+    overbought/oversold note - this keeps the Cardinal Rule's
+    Technicals/Timing layer a plain trend-structure read, not a
+    contrarian reversal call (a separate, unbuilt idea)."""
+    if current_price is None or sma20 is None or sma50 is None:
+        return 0, "N/A - insufficient price history for MA calc (need 50 daily bars)"
+
+    slope_pct = ((sma20 - sma20_10d_ago) / sma20_10d_ago * 100) if sma20_10d_ago else 0
+    bullish_structure = current_price > sma20 > sma50
+    bearish_structure = current_price < sma20 < sma50
+
+    if bullish_structure and slope_pct > 0.1:
+        score = 2
+        note = (f"Uptrend: price above rising 20/50-day MAs "
+                 f"(20MA slope {slope_pct:+.1f}% over 10 sessions)")
+    elif bullish_structure:
+        score = 1
+        note = (f"Uptrend structure but 20-day MA flattening "
+                 f"(slope {slope_pct:+.1f}% over 10 sessions) - momentum may be fading")
+    elif bearish_structure and slope_pct < -0.1:
+        score = -2
+        note = (f"Downtrend: price below falling 20/50-day MAs "
+                 f"(20MA slope {slope_pct:+.1f}% over 10 sessions)")
+    elif bearish_structure:
+        score = -1
+        note = (f"Downtrend structure but 20-day MA flattening "
+                 f"(slope {slope_pct:+.1f}% over 10 sessions) - may be stabilizing")
+    else:
+        score = 0
+        note = (f"Mixed/transitional: price ${current_price:.2f} vs "
+                 f"20MA ${sma20:.2f} vs 50MA ${sma50:.2f} - no clear structure")
+
+    if rsi is not None:
+        if rsi >= 70:
+            note += f" | RSI {rsi:.0f} - overbought, some pullback risk"
+        elif rsi <= 30:
+            note += f" | RSI {rsi:.0f} - oversold, some bounce potential"
+        else:
+            note += f" | RSI {rsi:.0f}"
+
+    return score, note
 
 
 def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector_etf_symbol,
@@ -1026,19 +1113,28 @@ def fetch_ticker_data(ticker, api_key, spy_return_21d, sector_return_21d, sector
         quote = av_request(
             {"function": "GLOBAL_QUOTE", "symbol": ticker, "datatype": "csv"}, api_key
         )
-        raw_change = quote.get("changePercent", "")
-        change_pct = float(raw_change.replace("%", "")) if raw_change else None
-        score, note = score_momentum(change_pct)
-        change_display = f"'{raw_change}" if raw_change else "N/A"
+        raw_price = quote.get("price")
+        try:
+            quote_price = float(raw_price) if raw_price else None
+        except (ValueError, TypeError):
+            quote_price = None
+        daily_rows = raw_series_cache.get(ticker, [])
+        sma20, sma50, sma20_10d_ago = compute_moving_averages(daily_rows)
+        rsi = compute_rsi(daily_rows)
+        score, note = score_technical_setup(quote_price, sma20, sma50, sma20_10d_ago, rsi)
+        price_display = f"{quote_price:.2f}" if quote_price is not None else (raw_price or "N/A")
+        sma20_display = f"{sma20:.2f}" if sma20 is not None else "N/A"
+        sma50_display = f"{sma50:.2f}" if sma50 is not None else "N/A"
+        rsi_display = f"RSI {rsi:.0f}" if rsi is not None else "N/A"
         rows.append([
-            ticker, 18, "Price Momentum Pulse (Phase 1 stand-in)",
-            quote.get("price") or "N/A", quote.get("previousClose") or "N/A", "N/A",
-            change_display, quote.get("latestDay", today),
-            "Technical-Placeholder", score, note,
-            "Alpha Vantage: GLOBAL_QUOTE",
+            ticker, 18, "Technical Setup (20/50-day MA structure + RSI-14)",
+            price_display, sma20_display, sma50_display,
+            rsi_display, quote.get("latestDay", today),
+            "Technicals/Timing", score, note,
+            "Alpha Vantage: GLOBAL_QUOTE + TIME_SERIES_DAILY_ADJUSTED",
         ])
     except Exception as e:
-        print(f"[FAIL] {ticker} Price Momentum: {e}")
+        print(f"[FAIL] {ticker} Technical Setup: {e}")
 
     return rows, earnings_calendar_row, iv_snapshot_row
 

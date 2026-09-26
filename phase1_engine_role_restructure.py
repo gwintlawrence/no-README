@@ -96,7 +96,15 @@ ENGINE_ROLE_MAP = {
     14: "CONFIRMATION",          # Institutional Holdings Sentiment
     15: "CONFIRMATION",          # Put/Call Ratio
     16: "CONTEXT",               # Insider Activity
-    18: "MANUAL / UNVERIFIED",   # Price Momentum Pulse (Technical-Placeholder)
+    18: "MANUAL / UNVERIFIED",   # Technical Setup (20/50-day MA + RSI-14) — FLAG FOR COACH REVIEW:
+                                  # this indicator was Phase-1's daily-%-change placeholder, upgraded
+                                  # 2026-09-27 to a real MA-structure + RSI calc (see
+                                  # f4p_equities_weekly_update.py: compute_moving_averages /
+                                  # compute_rsi / score_technical_setup). It's no longer a flagged
+                                  # placeholder, so MANUAL/UNVERIFIED may no longer be the right
+                                  # bucket — but which bucket (its own TECHNICAL/TIMING category?
+                                  # CONFIRMATION alongside 11/12?) is a methodology call for Coach,
+                                  # left unchanged here pending that sign-off.
     # 17 (IV Rank) does not exist yet in the Hub — no entry needed.
 }
 

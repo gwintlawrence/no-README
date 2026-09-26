@@ -53,14 +53,15 @@ CONTENT = [
      "gaps more than once - trust it over a green checkmark."],
 
     ["What's live vs. what's a placeholder",
-     "17 of 18 planned indicators are live: 15 field-verified against "
-     "Alpha Vantage data, plus Forward Guidance and Catalyst Pipeline "
-     "via Claude web research. Price Momentum Pulse is explicitly a "
-     "placeholder for full technical analysis (just daily % change), "
-     "flagged with a 'Technical-Placeholder' tag - don't weight it as "
-     "heavily as the other Confirmation-layer indicators. Only IV Rank "
-     "remains - it's accumulating weekly ATM IV snapshots in OPTIONS "
-     "FLOW & IV, and needs roughly a year of history before a real "
+     "18 of 18 planned indicators are now live: 15 field-verified against "
+     "Alpha Vantage data, Forward Guidance and Catalyst Pipeline via Claude "
+     "web research, and Technical Setup (20/50-day MA structure + RSI-14, "
+     "tagged 'Technicals/Timing') as of 2026-09-27, replacing the earlier "
+     "daily-%-change placeholder. Its ENGINE/ROLE bucket in "
+     "phase1_engine_role_restructure.py is still awaiting Coach's "
+     "classification sign-off, same as any other reclassification. Only "
+     "IV Rank remains - it's accumulating weekly ATM IV snapshots in "
+     "OPTIONS FLOW & IV, and needs roughly a year of history before a real "
      "percentile means anything. That's a time constraint, not a "
      "build constraint."],
 
