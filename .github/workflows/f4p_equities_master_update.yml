@@ -1,29 +1,36 @@
 name: F4P Equities Master Weekly Update
 
-# Runs all nine weekly steps in the correct order, in one job, one click:
+# Runs all ten weekly steps in the correct order, in one job, one click:
 #   1. f4p_equities_weekly_update.py      - Alpha Vantage data (17 indicators)
 #   2. f4p_equities_qualitative_update.py - Claude research (guidance/catalysts)
-#   3. setup_equity_rankings.py           - refresh the ranking formulas
-#   4. setup_macro_overlay.py             - Economic block (reuses FX Hub data)
-#   5. setup_rates_environment.py         - Rates block (FRED)
-#   6. setup_credit_environment.py        - Credit block (FRED)
-#   7. setup_equity_regime.py             - Equity Market Regime block (Alpha Vantage)
-#   8. setup_vix_environment.py           - VIX block (FRED)
-#   9. phase1_engine_role_restructure.py  - ENGINE/ROLE classification,
+#   3. setup_thesis_workspace.py          - Thesis Workspace Evidence Layer
+#                                            (Phase 3) - reads Step 1's
+#                                            indicators and Step 2's
+#                                            structured catalyst tab, so it
+#                                            must run immediately after both.
+#   4. setup_equity_rankings.py           - refresh the ranking formulas
+#   5. setup_macro_overlay.py             - Economic block (reuses FX Hub data)
+#   6. setup_rates_environment.py         - Rates block (FRED)
+#   7. setup_credit_environment.py        - Credit block (FRED)
+#   8. setup_equity_regime.py             - Equity Market Regime block (Alpha Vantage)
+#   9. setup_vix_environment.py           - VIX block (FRED)
+#  10. phase1_engine_role_restructure.py  - ENGINE/ROLE classification,
 #                                            STRATEGY DASHBOARD rebuild, AND
 #                                            the Market Environment synthesis
-#                                            that reads steps 4-8's output
+#                                            that reads steps 5-9's output
 #
-# Steps 4-9 were all previously separate, manual-only workflows. Confirmed
+# Steps 5-9 were all previously separate, manual-only workflows. Confirmed
 # 2026-09-12 that leaving them manual is a real gap, not a convenience:
-# Phase 1's dashboard rebuild (step 9) fully overwrites STRATEGY DASHBOARD
+# Phase 1's dashboard rebuild (step 10) fully overwrites STRATEGY DASHBOARD
 # every time it runs, including the Market Environment column - so if
-# steps 4-8 don't run first in the SAME cycle, step 9 either writes a
-# stale environment read or the placeholder text, silently. Steps 4-8
-# must precede step 9 in this same job for that reason - order matters
-# here, not just presence.
+# steps 5-9 don't run first in the SAME cycle, step 10 either writes a
+# stale environment read or the placeholder text, silently. Steps 5-9
+# must precede step 10 in this same job for that reason - order matters
+# here, not just presence. The same is now true of Step 3: it must run
+# after Steps 1-2 in the same cycle, or its Evidence columns will read
+# stale or N/A instead of this week's real data.
 #
-# This replaces running those nine workflows manually in sequence.
+# This replaces running these ten workflows manually in sequence.
 # Scheduled for Saturday, same cadence as the FX Hub - see the note in
 # f4p_equities_weekly_update.yml about why its own schedule was removed
 # (this workflow now owns the schedule, to avoid double-running and
@@ -62,47 +69,54 @@ jobs:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
 
-      - name: "Step 3 - Refresh ranking formulas"
+      - name: "Step 3 - Thesis Workspace Evidence Layer (Phase 3)"
+        run: python setup_thesis_workspace.py
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+
+      - name: "Step 4 - Refresh ranking formulas"
         run: python setup_equity_rankings.py
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
 
-      - name: "Step 4 - Economic Environment (macro overlay)"
+      - name: "Step 5 - Economic Environment (macro overlay)"
         run: python setup_macro_overlay.py
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
 
-      - name: "Step 5 - Rates Environment"
+      - name: "Step 6 - Rates Environment"
         run: python setup_rates_environment.py
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
 
-      - name: "Step 6 - Credit Environment"
+      - name: "Step 7 - Credit Environment"
         run: python setup_credit_environment.py
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
 
-      - name: "Step 7 - Equity Market Regime"
+      - name: "Step 8 - Equity Market Regime"
         run: python setup_equity_regime.py
         env:
           ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
 
-      - name: "Step 8 - VIX Environment"
+      - name: "Step 9 - VIX Environment"
         run: python setup_vix_environment.py
         env:
           FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
           EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
 
-      - name: "Step 9 - ENGINE/ROLE classification, Dashboard + Market Environment"
+      - name: "Step 10 - ENGINE/ROLE classification, Dashboard + Market Environment"
         run: python phase1_engine_role_restructure.py
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
