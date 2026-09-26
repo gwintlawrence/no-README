@@ -1,0 +1,54 @@
+name: F4P Equities Thesis Workspace (Phase 3 Evidence Layer)
+
+# Builds/refreshes the THESIS WORKSPACE tab: per-ticker Evidence columns
+# (Consensus EPS, Consensus Revenue, Estimate Revisions, Recent
+# Repricing, Valuation Context, Catalyst Summary) plus the blank-by-
+# default Human Thesis fields and Expectations Classification/Thesis
+# Status columns.
+#
+# GOVERNANCE (Phase 3, approved by Glenise):
+#   - The 10 Human Thesis fields are blank by default and populated only
+#     by a human, directly in the Sheet. This workflow's script never
+#     writes to them - it only carries forward whatever a human already
+#     entered, using the same preserve-across-rebuild pattern already
+#     used for Capital Deployment/Decision in STRATEGY DASHBOARD.
+#   - Expectations Classification is manual - never calculated here.
+#   - Valuation Context is raw evidence only (published P/E from Alpha
+#     Vantage COMPANY_OVERVIEW) - no thresholds, no fair-value model, no
+#     automatic cheap/expensive judgment.
+#   - Research Assistant Suggestions (AI commentary) are a separate,
+#     later Phase 3 step, not part of this script.
+#
+# RUN ORDER: must run AFTER f4p_equities_weekly_update.py (writes
+# indicators 1, 2, 4, 11 to EQUITIES HUB DATA) and AFTER
+# f4p_equities_qualitative_update.py (writes the THESIS WORKSPACE
+# CATALYSTS tab this script reads from). Standalone/workflow_dispatch
+# here for manual runs and testing; also wired into
+# f4p_equities_master_update.yml as Step 3 so it always runs
+# automatically in the correct order.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  thesis_workspace:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install gspread google-auth requests
+
+      - name: "Build/refresh THESIS WORKSPACE evidence layer"
+        run: python setup_thesis_workspace.py
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
+          ALPHA_VANTAGE_API_KEY: ${{ secrets.ALPHA_VANTAGE_API_KEY }}
+
+    
