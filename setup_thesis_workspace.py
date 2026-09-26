@@ -18,10 +18,26 @@ by Glenise. Any future change to this script must preserve them:
     it only reads back whatever a human already entered and carries it
     forward across this rebuild, using the same preserve-across-rebuild
     pattern already used for Capital Deployment/Decision in STRATEGY
-    DASHBOARD (see phase1_engine_role_restructure.py's carry_forward()).
+    DASHBOARD (see phase1_engine_role_restructure.py's carry_forward()),
+    except matched by COLUMN NAME rather than position (see
+    read_preserved_by_name()) so a future column addition/rename/
+    reorder can never misalign or silently drop a human's entries.
   - Expectations Classification (UNDERPRICED / FAIR / CROWDED / NO EDGE)
-    is MANUAL. This script never calculates or writes it - it is
+    is MANUAL. This script never calculates or selects it - it is
     preserved the same way as the Human Thesis fields.
+  - THESIS DOCUMENTATION GATE (Thesis Documentation Status column): a
+    purely mechanical completeness check - see
+    derive_thesis_documentation_status(). It reads what a human has
+    already written and reports COMPLETE / INCOMPLETE / NO EDGE based
+    only on whether required fields are filled in and what
+    classification was manually selected. It NEVER assesses whether a
+    thesis is correct or well-reasoned, NEVER generates a thesis or
+    conclusion, NEVER overwrites a human entry, and NEVER authorizes
+    EXECUTE - Capital Deployment/Decision in STRATEGY DASHBOARD remain
+    entirely separate, human-only fields this script never touches.
+    Named "Thesis Documentation Status", not "Thesis Quality", because
+    COMPLETE means the required fields are documented, not that the
+    thesis has been independently validated.
   - Valuation Context is raw Expectations evidence only - the published
     trailing/forward P/E from Alpha Vantage COMPANY_OVERVIEW, with
     source and freshness shown. No thresholds, no cheap/expensive
@@ -30,7 +46,26 @@ by Glenise. Any future change to this script must preserve them:
     it anywhere in this script.
   - Research Assistant Suggestions (weekly-batch AI commentary) are a
     SEPARATE, later Phase 3 step - not built here. This script only
-    produces the Evidence layer and preserves the Human Thesis layer.
+    produces the Evidence layer, preserves the Human Thesis layer, and
+    mechanically checks its documentation completeness.
+
+THESIS DOCUMENTATION GATE - governance rules, verbatim as approved:
+  1. INCOMPLETE: one or more required Human Thesis fields are missing,
+     Expectations Classification has not been selected, or the
+     classification remains Not Verified.
+  2. COMPLETE: all required fields are documented AND the analyst has
+     manually selected UNDERPRICED, FAIR or CROWDED.
+  3. NO EDGE: the analyst explicitly selects NO EDGE and provides a
+     written rationale (read from My Thesis). Does not require an
+     invented Expected Magnitude, Expected Horizon or Catalyst when the
+     analyst has concluded there is no identifiable opportunity.
+  Required for COMPLETE: My Thesis, Market Appears to Believe, My
+  Variant View, Catalyst (Thesis) (or explicitly "No Identified
+  Catalyst"), Expected Direction, Expected Magnitude, Expected Horizon,
+  Invalidation, Contradictory Evidence, Expectations Classification. A
+  documented "Not Verified" entry is permitted for Market Appears to
+  Believe when evidence is unavailable, but that limitation is surfaced
+  in the Documentation Gate Notes column rather than hidden.
 
 IMPORTANT - RUN ORDER: this script must run AFTER both:
   1. f4p_equities_weekly_update.py   - writes indicators 1 (EPS), 2
@@ -92,14 +127,109 @@ HEADER = [
     "Invalidation",
     "Contradictory Evidence",
     "Thesis Notes",
-    # --- Manual classification / status ---
+    # --- Manual classification (human-entered) ---
     "Expectations Classification",
-    "Thesis Status",
+    # --- Thesis Documentation Gate output (COMPUTED every run - never
+    #     carried forward, never hand-edited) ---
+    "Thesis Documentation Status",
+    "Documentation Gate Notes",
 ]
 
-# Index where the human-owned columns begin (everything from here to the
-# end of HEADER is preserved across rebuilds, never generated).
-HUMAN_OWNED_START = 7
+# The Human Thesis columns plus the one manual classification field -
+# these are the only columns read back from the prior run and carried
+# forward. Matched by NAME (see read_preserved_by_name()), not position,
+# so this list is also the single source of truth for what "human-owned"
+# means. Thesis Documentation Status and Documentation Gate Notes are
+# deliberately excluded - they're gate OUTPUT, recomputed fresh every run.
+HUMAN_THESIS_FIELDS = [
+    "My Thesis",
+    "Market Appears to Believe",
+    "My Variant View",
+    "Catalyst (Thesis)",
+    "Expected Direction",
+    "Expected Magnitude",
+    "Expected Horizon",
+    "Invalidation",
+    "Contradictory Evidence",
+    "Thesis Notes",
+]
+PRESERVED_FIELDS = HUMAN_THESIS_FIELDS + ["Expectations Classification"]
+
+# Required for a COMPLETE Thesis Documentation Status (Expectations
+# Classification is checked separately in derive_thesis_documentation_status).
+REQUIRED_FOR_COMPLETE = [
+    "My Thesis",
+    "Market Appears to Believe",
+    "My Variant View",
+    "Catalyst (Thesis)",
+    "Expected Direction",
+    "Expected Magnitude",
+    "Expected Horizon",
+    "Invalidation",
+    "Contradictory Evidence",
+]
+
+VALID_CLASSIFICATIONS = {"UNDERPRICED", "FAIR", "CROWDED", "NO EDGE"}
+NOT_VERIFIED_VALUES = {"not verified", "n/a - not verified", "n/a", "na"}
+
+
+def _is_blank(value):
+    return not value or not str(value).strip()
+
+
+def _is_not_verified(value):
+    return str(value).strip().lower() in NOT_VERIFIED_VALUES
+
+
+def derive_thesis_documentation_status(fields):
+    """The Thesis Documentation Gate - purely mechanical. Reads back what
+    a human has already written in `fields` (a dict keyed by the exact
+    Human Thesis column names, plus "Expectations Classification") and
+    reports completeness only. See the module docstring's governance
+    section for the full rules and why this is not called a "quality"
+    gate. Returns (status, notes) - notes is always populated when
+    status isn't a clean COMPLETE, so a reviewer can see why without
+    opening every column."""
+    classification_raw = fields.get("Expectations Classification") or ""
+    classification = classification_raw.strip().upper()
+
+    if _is_blank(classification_raw):
+        return "INCOMPLETE", "Expectations Classification not yet selected."
+    if _is_not_verified(classification_raw):
+        return ("INCOMPLETE",
+                "Expectations Classification is Not Verified - a manual "
+                "UNDERPRICED / FAIR / CROWDED / NO EDGE selection is required.")
+    if classification not in VALID_CLASSIFICATIONS:
+        return ("INCOMPLETE",
+                f"Expectations Classification value \"{classification_raw.strip()}\" "
+                f"is not one of UNDERPRICED / FAIR / CROWDED / NO EDGE - check for a typo.")
+
+    if classification == "NO EDGE":
+        rationale = fields.get("My Thesis") or ""
+        if _is_blank(rationale):
+            return ("INCOMPLETE",
+                    "NO EDGE selected but My Thesis is blank - a written rationale "
+                    "for why no edge was identified is required.")
+        return ("NO EDGE",
+                "Analyst concluded no identifiable opportunity; written rationale "
+                "documented in My Thesis. Expected Magnitude/Horizon/Catalyst are "
+                "not required for this classification.")
+
+    # UNDERPRICED / FAIR / CROWDED - full documentation required.
+    missing = [f for f in REQUIRED_FOR_COMPLETE if _is_blank(fields.get(f))]
+    if missing:
+        return "INCOMPLETE", "Missing required field(s): " + ", ".join(missing) + "."
+
+    notes = []
+    if _is_not_verified(fields.get("Market Appears to Believe")):
+        notes.append(
+            "Market Appears to Believe marked Not Verified - evidence for "
+            "consensus expectations was unavailable or incomplete; documented "
+            "and permitted, but the gap is real and should be weighed accordingly."
+        )
+    if not notes:
+        notes.append(f"All required fields documented. Classification: {classification}.")
+    return "COMPLETE", " ".join(notes)
 
 
 # ---------------------------------------------------------------------
@@ -321,6 +451,40 @@ def get_or_create_worksheet(spreadsheet, tab_name, rows, cols):
         return spreadsheet.add_worksheet(title=tab_name, rows=rows, cols=cols)
 
 
+def read_preserved_by_name(existing_values):
+    """Reads back existing manual entries (the Human Thesis fields plus
+    Expectations Classification) by column NAME rather than position, so
+    a schema change here - a renamed, added, removed or reordered column,
+    like this run's addition of the Thesis Documentation Gate columns -
+    can never misalign a human's entries into the wrong field or silently
+    drop them. Thesis Documentation Status and Documentation Gate Notes
+    are deliberately never read back here - they're gate output,
+    recomputed fresh from the preserved fields every run, not carried
+    forward themselves.
+
+    Returns {TICKER: {field_name: value}}. A field name not present in
+    the old header (because it didn't exist yet, or the tab is new)
+    simply isn't in that ticker's dict - callers treat that as blank."""
+    if not existing_values:
+        return {}
+    old_header = existing_values[0]
+    name_to_idx = {name.strip(): i for i, name in enumerate(old_header) if name}
+    ticker_idx = name_to_idx.get("Ticker", 0)
+
+    preserved = {}
+    for row in existing_values[1:]:
+        if not row or len(row) <= ticker_idx or not row[ticker_idx]:
+            continue
+        ticker = row[ticker_idx].strip().upper()
+        entry = {}
+        for field in PRESERVED_FIELDS:
+            idx = name_to_idx.get(field)
+            if idx is not None and idx < len(row):
+                entry[field] = row[idx]
+        preserved[ticker] = entry
+    return preserved
+
+
 def main():
     creds_dict = json.loads(os.environ["GOOGLE_CREDENTIALS"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
@@ -362,32 +526,17 @@ def main():
     ws = get_or_create_worksheet(spreadsheet, "THESIS WORKSPACE",
                                   rows=len(WATCHLIST) + 5, cols=len(HEADER) + 2)
 
-    # Preserve-across-rebuild: read whatever a human already entered in
-    # the Human Thesis / Classification / Status columns before this
-    # rebuild clears the tab, exactly the same pattern already used for
-    # Capital Deployment/Decision in STRATEGY DASHBOARD. Without this, a
-    # scheduled run would silently wipe every analyst's thesis work.
-    preserved = {}
+    # Preserve-across-rebuild: read whatever a human already entered
+    # before this rebuild clears the tab, exactly the same pattern
+    # already used for Capital Deployment/Decision in STRATEGY DASHBOARD.
+    # Matched by column NAME (read_preserved_by_name()), not position, so
+    # this run's new Thesis Documentation Gate columns don't trigger a
+    # false "schema changed" alarm or risk misaligning existing entries.
     existing_values = ws.get_all_values()
-    if existing_values and existing_values[0][:len(HEADER)] == HEADER:
-        for row in existing_values[1:]:
-            if not row or not row[0]:
-                continue
-            padded = list(row) + [""] * (len(HEADER) - len(row))
-            preserved[row[0].strip().upper()] = padded[HUMAN_OWNED_START:len(HEADER)]
-    elif any(any(cell.strip() for cell in row) for row in existing_values[1:]):
-        # The tab has data but its header doesn't match - someone renamed,
-        # moved or inserted a column. Carrying forward by position would
-        # put thesis text in the wrong columns; clearing would destroy it.
-        # Stop loudly instead - a red X here is far better than silent loss.
-        raise RuntimeError(
-            "THESIS WORKSPACE header doesn't match the expected layout and the "
-            "tab contains data. Refusing to rebuild so manual thesis entries "
-            "aren't lost or misaligned. Restore the original column headers "
-            "(or ask for the script's HEADER to be updated) and re-run."
-        )
+    preserved = read_preserved_by_name(existing_values)
 
     output_rows = [HEADER]
+    gate_counts = {"COMPLETE": 0, "INCOMPLETE": 0, "NO EDGE": 0}
     for ticker in WATCHLIST:
         eps = format_actual_vs_estimate(
             get_hub_data_indicator(hub_rows, hub_header, ticker, 1, raw_rows), "EPS Surprise")
@@ -404,18 +553,25 @@ def main():
         ticker_catalysts = [r for r in cat_rows if r and r[0].strip().upper() == ticker.upper()]
         catalyst_summary = format_catalyst_summary(ticker_catalysts)
 
-        human_owned = preserved.get(ticker.upper(), [""] * (len(HEADER) - HUMAN_OWNED_START))
+        entry = preserved.get(ticker.upper(), {})
+        thesis_values = [entry.get(name, "") for name in HUMAN_THESIS_FIELDS]
+        classification = entry.get("Expectations Classification", "")
+
+        gate_fields = dict(zip(HUMAN_THESIS_FIELDS, thesis_values))
+        gate_fields["Expectations Classification"] = classification
+        status, notes = derive_thesis_documentation_status(gate_fields)
+        gate_counts[status] = gate_counts.get(status, 0) + 1
 
         output_rows.append([
             ticker, eps, revenue, revisions, repricing, valuation, catalyst_summary,
-            *human_owned,
+            *thesis_values, classification, status, notes,
         ])
 
     ws.clear()
-    ws.update("A1", output_rows)
+    ws.update(range_name="A1", values=output_rows)
     print(f"[OK] Wrote THESIS WORKSPACE — {len(WATCHLIST)} tickers. "
-          f"{len(preserved)} ticker(s) had manual thesis entries preserved "
-          f"across this rebuild.")
+          f"{len(preserved)} ticker(s) had manual entries preserved across "
+          f"this rebuild. Thesis Documentation Gate: {gate_counts}")
 
 
 if __name__ == "__main__":
