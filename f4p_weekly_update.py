@@ -618,25 +618,56 @@ def get_or_create_tab(spreadsheet, tab_name: str, rows: int, cols: int):
 
 
 def write_hub_data(spreadsheet, data: dict, today: str):
-    ws = get_or_create_tab(spreadsheet, SHEET_TAB_NAME, rows=250, cols=12)
-
+    # Build the full row list FIRST, before touching the sheet at all.
+    # Previously this cleared the "AI HUB DATA" tab (via get_or_create_tab's
+    # ws.clear()) and only then built `values` using strict row["key"]
+    # access - so a single malformed row from Claude's response (missing
+    # any of currency/indicator_num/indicator/current_value/prior_value/
+    # release_date/score/analysis) raised a KeyError AFTER the tab was
+    # already wiped, and nothing ever got written back. Since main() wraps
+    # each section in a try/except (so one bad section doesn't take the
+    # whole run down), that KeyError was swallowed and logged as
+    # "HUB SECTION FAILED", while the GitHub Actions job itself still
+    # exited 0 - so the tab stayed silently blank until the next clean run,
+    # with nothing in the Actions UI marked as failed. Confirmed live on
+    # 2026-09-28: the tab was found completely empty (no header row even)
+    # while the job history showed "success".
+    #
+    # Fix: build `values` defensively (skip and flag a malformed row
+    # instead of crashing), and never clear the sheet unless at least one
+    # good row survived - so a partial/bad batch leaves last week's real
+    # data in place instead of wiping it.
     values = [HEADER_ROW]
+    skipped = []
     for row in data["rows"]:
-        values.append([
-            row["currency"],
-            row["indicator_num"],
-            row["indicator"],
-            row["current_value"],
-            row["prior_value"],
-            row.get("forecast", "N/A"),
-            row.get("surprise", "N/A"),
-            row["release_date"],
-            row.get("tag", ""),
-            row["score"],
-            row["analysis"],
-            row.get("source_url", ""),
-        ])
+        try:
+            values.append([
+                row["currency"],
+                row["indicator_num"],
+                row["indicator"],
+                row.get("current_value", "N/A - Not Verified"),
+                row.get("prior_value", "N/A - Not Verified"),
+                row.get("forecast", "N/A"),
+                row.get("surprise", "N/A"),
+                row.get("release_date", "N/A - Not Verified"),
+                row.get("tag", ""),
+                row.get("score", "N/A - Not Verified"),
+                row.get("analysis", "N/A - Not Verified"),
+                row.get("source_url", ""),
+            ])
+        except KeyError as exc:
+            skipped.append(
+                f"{row.get('currency', '?')} indicator {row.get('indicator_num', '?')}: "
+                f"row missing required field {exc} - skipped, not written"
+            )
 
+    if len(values) == 1:
+        raise RuntimeError(
+            "Every hub-data row was malformed (missing a required field) - "
+            "refusing to clear/write 'AI HUB DATA', keeping last week's data in place."
+        )
+
+    ws = get_or_create_tab(spreadsheet, SHEET_TAB_NAME, rows=250, cols=12)
     ws.update(values, "A1")
     ws.format("A1:L1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
 
@@ -646,7 +677,7 @@ def write_hub_data(spreadsheet, data: dict, today: str):
     footer_row = len(values) + 2
     footer_values = [[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]]
 
-    flags = data.get("data_unavailable_flags", [])
+    flags = data.get("data_unavailable_flags", []) + skipped
     if flags:
         footer_values.append(["DATA UNAVAILABLE / NEEDS MANUAL CHECK:"])
         footer_values.extend([[f] for f in flags])
@@ -681,24 +712,38 @@ def write_carry_trade(spreadsheet, data: dict, today: str):
 
 
 def write_central_bank(spreadsheet, data: dict, today: str):
-    ws = get_or_create_tab(spreadsheet, CENTRAL_BANK_TAB_NAME, rows=30, cols=7)
+    # Same clear-before-verified-write bug as write_hub_data, fixed the
+    # same way: build `values` defensively first, only clear/write the
+    # sheet once at least one good row exists.
     values = [CENTRAL_BANK_HEADER_ROW]
+    skipped = []
     for row in data["rows"]:
-        values.append([
-            row["central_bank"],
-            row["bias"],
-            row["score"],
-            row["latest_meeting"],
-            row["next_meeting"],
-            row["forward_guidance_note"],
-            row.get("source_url", ""),
-        ])
+        try:
+            values.append([
+                row["central_bank"],
+                row.get("bias", "N/A - Not Verified"),
+                row.get("score", "N/A - Not Verified"),
+                row.get("latest_meeting", "N/A"),
+                row.get("next_meeting", "N/A"),
+                row.get("forward_guidance_note", "N/A - Not Verified"),
+                row.get("source_url", ""),
+            ])
+        except KeyError as exc:
+            skipped.append(f"{row.get('central_bank', '?')}: row missing required field {exc} - skipped, not written")
+
+    if len(values) == 1:
+        raise RuntimeError(
+            "Every central-bank row was malformed (missing a required field) - "
+            "refusing to clear/write 'CENTRAL BANK', keeping last week's data in place."
+        )
+
+    ws = get_or_create_tab(spreadsheet, CENTRAL_BANK_TAB_NAME, rows=30, cols=7)
     ws.update(values, "A1")
     ws.format("A1:G1", {"textFormat": {"bold": True}, "backgroundColor": {"red": 0.05, "green": 0.1, "blue": 0.16}})
 
     footer_row = len(values) + 2
     footer_values = [[f"Last auto-updated: {today} | {data.get('data_cutoff', '')}"]]
-    flags = data.get("data_unavailable_flags", [])
+    flags = data.get("data_unavailable_flags", []) + skipped
     if flags:
         footer_values.append(["DATA UNAVAILABLE / NEEDS MANUAL CHECK:"])
         footer_values.extend([[f] for f in flags])
