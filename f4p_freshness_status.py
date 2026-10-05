@@ -38,7 +38,8 @@ SOURCES = [
      'current_hours': 10 * 24, 'stale_hours': 17 * 24},       # weekly, as-of is the prior Tuesday
 ]
 
-_DATE_FORMATS = ('%Y-%m-%d', '%m/%d/%Y', '%d %b %Y', '%Y/%m/%d')
+# '%y%m%d' is the COT AS OF DATE format on FRED AUTO (e.g. 260922 = 2026-09-22).
+_DATE_FORMATS = ('%Y-%m-%d', '%m/%d/%Y', '%d %b %Y', '%Y/%m/%d', '%y%m%d')
 
 
 def parse_run_stamp(text):

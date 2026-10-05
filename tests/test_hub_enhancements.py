@@ -154,6 +154,13 @@ class FreshnessTests(unittest.TestCase):
         r = fs.evaluate(fs.SOURCES, boom, self.NOW)
         self.assertEqual(r['overall'], 'UNKNOWN')
 
+    def test_cot_yymmdd_dates_from_live_sheet(self):
+        self.assertEqual(fs.parse_date('260922'), datetime(2026, 9, 22, tzinfo=timezone.utc))
+        data = {('FRED AUTO', 'A1'): ['Last run: 2026-10-05 23:33 UTC'],
+                ('FRED AUTO', 'E18:E25'): ['260922'] * 8}
+        r = fs.evaluate(fs.SOURCES, lambda tab, a1: data[(tab, a1)], self.NOW)
+        self.assertEqual(r['sources'][1]['status'], 'DELAYED')   # 13 days old, honest flag
+
     def test_one_bad_cot_date_makes_feed_unknown(self):
         data = {('FRED AUTO', 'A1'): ['Last run: 2026-10-05 22:31 UTC'],
                 ('FRED AUTO', 'E18:E25'): ['2026-09-29', 'garbled']}
