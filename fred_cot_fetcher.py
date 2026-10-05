@@ -29,6 +29,22 @@ FRED_SERIES = [
     ('A191RL1Q225SBEA', 'latest', 'GDP Growth Rate %',           13),
 ]
 
+# Source lineage (Hub enhancement #1): the publishing agency behind each FRED
+# series, shown beside every value so a reader can see where it came from.
+# FRED itself is only the delivery channel, not the origin of the number.
+FRED_SOURCE_AGENCY = {
+    'FEDFUNDS':        'Board of Governors of the Federal Reserve System',
+    'CPIAUCSL':        'U.S. Bureau of Labor Statistics',
+    'CPILFESL':        'U.S. Bureau of Labor Statistics',
+    'PPIACO':          'U.S. Bureau of Labor Statistics',
+    'PPIFES':          'U.S. Bureau of Labor Statistics',
+    'PAYEMS':          'U.S. Bureau of Labor Statistics',
+    'UNRATE':          'U.S. Bureau of Labor Statistics',
+    'PERMIT':          'U.S. Census Bureau',
+    'UMCSENT':         'University of Michigan',
+    'A191RL1Q225SBEA': 'U.S. Bureau of Economic Analysis',
+}
+
 COT_CODES = {
     'USD': '098662',
     'EUR': '099741',
@@ -71,6 +87,30 @@ def get_fred_value(series_id, calculation):
         prior_val = float(valid[1]['value'])
         return round(latest_val - prior_val, 1), latest_date
     return None, latest_date
+
+
+def get_fred_meta(series_id):
+    """
+    Lineage metadata for one FRED series: FRED's own last-updated timestamp.
+    Purely additive - any failure returns None and must never fail the run
+    or change a value the Hub already shows.
+    """
+    try:
+        url = (
+            'https://api.stlouisfed.org/fred/series'
+            '?series_id=' + series_id +
+            '&api_key=' + FRED_API_KEY +
+            '&file_type=json'
+        )
+        resp = requests.get(url, timeout=30)
+        resp.raise_for_status()
+        seriess = resp.json().get('seriess', [])
+        if not seriess:
+            return None
+        return {'last_updated': seriess[0].get('last_updated', '')}
+    except Exception as e:
+        print('  -> lineage metadata unavailable for ' + series_id + ': ' + str(e))
+        return None
 
 
 def get_cot_data():
@@ -167,7 +207,8 @@ def ensure_tab_exists(service):
         print('Tab exists: ' + TAB_NAME)
 
 
-def write_to_sheet(service, fred_results, cot_results, is_friday):
+def write_to_sheet(service, fred_results, cot_results, is_friday, fred_meta=None):
+    fred_meta = fred_meta or {}
     timestamp = datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')
 
     # Headers
@@ -195,6 +236,33 @@ def write_to_sheet(service, fred_results, cot_results, is_friday):
         range=TAB_NAME + '!A4:F13',
         valueInputOption='RAW',
         body={'values': rows}
+    ).execute()
+
+    # Source lineage columns (G:I), written beside the existing A:F block.
+    # Columns A:F are untouched, so everything that reads them (the weekly
+    # update, the macro overlay formulas) behaves exactly as before.
+    # NOTE: the existing 'RELEASE DATE' column (D) holds the observation
+    # period date from FRED, not the publication date; the new columns
+    # below add the missing pieces rather than relabelling D.
+    service.spreadsheets().values().update(
+        spreadsheetId=SPREADSHEET_ID,
+        range=TAB_NAME + '!G3:I3',
+        valueInputOption='RAW',
+        body={'values': [['SOURCE AGENCY', 'FRED LAST UPDATED', 'RETRIEVED (UTC)']]}
+    ).execute()
+    lineage_rows = []
+    for series_id, calc, label, sheet_row in FRED_SERIES:
+        meta = fred_meta.get(series_id) or {}
+        lineage_rows.append([
+            FRED_SOURCE_AGENCY.get(series_id, ''),
+            meta.get('last_updated', ''),
+            timestamp if fred_results.get(series_id, (None, None))[0] is not None else '',
+        ])
+    service.spreadsheets().values().update(
+        spreadsheetId=SPREADSHEET_ID,
+        range=TAB_NAME + '!G4:I13',
+        valueInputOption='RAW',
+        body={'values': lineage_rows}
     ).execute()
 
     # COT section header - only touches columns A/B here. Column C ("Last
@@ -286,6 +354,7 @@ def main():
           + (' (COT forced on)' if args.force_cot and run_time.weekday() != 4 else ''))
 
     fred_results = {}
+    fred_meta = {}
     for series_id, calc, label, _ in FRED_SERIES:
         print('Fetching FRED: ' + series_id + ' (' + calc + ')...')
         try:
@@ -295,6 +364,8 @@ def main():
         except Exception as e:
             print('  -> FAILED: ' + str(e))
             fred_results[series_id] = (None, None)
+        time.sleep(1)
+        fred_meta[series_id] = get_fred_meta(series_id)
         time.sleep(1)
 
     cot_results = {}
@@ -315,7 +386,7 @@ def main():
     for attempt in range(1, max_attempts + 1):
         try:
             ensure_tab_exists(service)
-            write_to_sheet(service, fred_results, cot_results, is_friday)
+            write_to_sheet(service, fred_results, cot_results, is_friday, fred_meta)
             break
         except HttpError as e:
             status = getattr(e.resp, 'status', None)
