@@ -9,8 +9,8 @@ Every FX idea is two legs. LONG EUR/USD = long EUR, short USD. SHORT EUR/USD
 = short EUR, long USD. Two ideas that load the same currency in the same
 direction are duplicated macro exposure, even though the pairs differ.
 
-LIMITS ARE PENDING GLENISE'S DECISION. The defaults below are starting values
-only. Change them in one place (DEFAULT_LIMITS) or pass your own.
+LIMITS are Glenise's own (idea counts, no pip limit for now). Change them in
+one place (DEFAULT_LIMITS) or pass your own.
 """
 
 from collections import defaultdict
@@ -18,8 +18,10 @@ from collections import defaultdict
 CURRENCIES = ('USD', 'EUR', 'GBP', 'JPY', 'CHF', 'CAD', 'AUD', 'NZD', 'NOK', 'SEK')
 
 DEFAULT_LIMITS = {
-    # Most ideas allowed on the same side of one currency before it is a BREACH.
-    'max_same_direction_per_currency': 2,
+    # Glenise's own numbers (set 2026-10-05): comfortable with 4 to 6 ideas on
+    # the same side of one currency. NOTICE at 4, BREACH above 6. Flags only.
+    'notice_same_direction': 4,
+    'max_same_direction_per_currency': 6,
     # Share of total net exposure one currency may hold before it is a WATCH.
     'concentration_watch_pct': 35.0,
     # Concentration is meaningless on a tiny book (one pair is always 50% per
@@ -75,7 +77,8 @@ def exposure_map(ideas):
 def check_exposure(ideas, limits=None):
     """
     Returns {'map': ..., 'warnings': [...], 'blocks_trade': False}.
-    Each warning: {'level': 'BREACH'|'WATCH', 'currency', 'message'}.
+    Each warning: {'level': 'BREACH'|'NOTICE'|'WATCH', 'currency', 'message'}.
+    NOTICE = same-direction ideas on one currency reached the heads-up level.
     BREACH = more same-direction ideas on one currency than the limit.
     WATCH  = one currency holds more than the concentration share.
     """
@@ -88,6 +91,13 @@ def check_exposure(ideas, limits=None):
         v = emap[ccy]
         for side in ('long', 'short'):
             n = v[side]
+            if lim['notice_same_direction'] is not None and \
+                    lim['notice_same_direction'] <= n <= lim['max_same_direction_per_currency']:
+                warnings.append({
+                    'level': 'NOTICE', 'currency': ccy,
+                    'message': '%d %s ideas on %s reached the heads-up level of %d: %s' % (
+                        n, side, ccy, lim['notice_same_direction'],
+                        ', '.join(v[side + '_ideas']))})
             if n > lim['max_same_direction_per_currency']:
                 warnings.append({
                     'level': 'BREACH', 'currency': ccy,
