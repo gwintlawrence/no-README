@@ -31,7 +31,7 @@ class ExposureTests(unittest.TestCase):
 
     def test_breach_and_watch_but_never_blocks(self):
         ideas = [('EUR/USD', 'SHORT'), ('GBP/USD', 'SHORT'), ('AUD/USD', 'SHORT')]
-        r = ex.check_exposure(ideas)           # 3 ideas long USD > default limit 2
+        r = ex.check_exposure(ideas, {'max_same_direction_per_currency': 2})  # 3 > 2
         levels = {(w['level'], w['currency']) for w in r['warnings']}
         self.assertIn(('BREACH', 'USD'), levels)
         self.assertIn(('WATCH', 'USD'), levels)
@@ -41,9 +41,24 @@ class ExposureTests(unittest.TestCase):
         r = ex.check_exposure([('EUR/USD', 'LONG'), ('USD/JPY', 'LONG'), ('GBP/USD', 'LONG')])
         self.assertFalse([w for w in r['warnings'] if w['level'] == 'BREACH'])
 
+    def test_no_concentration_watch_on_tiny_book(self):
+        r = ex.check_exposure([('EUR/USD', 'LONG')])
+        self.assertEqual(r['warnings'], [])
+
+    def test_glenise_limits_notice_at_4_breach_above_6(self):
+        def usd_long(n):
+            pairs = ['EUR/USD', 'GBP/USD', 'AUD/USD', 'NZD/USD', 'USD/JPY', 'USD/CHF', 'USD/CAD']
+            ideas = [(p, 'LONG' if p.startswith('USD') else 'SHORT') for p in pairs[:n]]
+            return {w['level'] for w in ex.check_exposure(ideas)['warnings'] if w['currency'] == 'USD'
+                    and w['level'] != 'WATCH'}
+        self.assertEqual(usd_long(3), set())
+        self.assertEqual(usd_long(4), {'NOTICE'})
+        self.assertEqual(usd_long(6), {'NOTICE'})
+        self.assertEqual(usd_long(7), {'BREACH'})   # one flag per side, the stronger one
+
     def test_custom_limits(self):
         r = ex.check_exposure([('EUR/USD', 'SHORT'), ('GBP/USD', 'SHORT')],
-                              {'max_same_direction_per_currency': 1})
+                              {'max_same_direction_per_currency': 1, 'notice_same_direction': None})
         self.assertTrue([w for w in r['warnings'] if w['level'] == 'BREACH'])
 
 
