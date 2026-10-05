@@ -1,0 +1,51 @@
+# ════════════════════════════════════════════════════════════════
+# F4P HUB FRESHNESS STATUS — MANUAL RUN ONLY
+# GWL Trading Team · Fishin4Pips System
+#
+# FILE LOCATION IN REPO: .github/workflows/f4p_freshness_status.yml
+#
+# WHAT THIS DOES:
+#   - Reads the timestamps the pipeline already wrote to FRED AUTO
+#   - Labels each feed CURRENT / DELAYED / STALE / UNKNOWN
+#   - Writes the result to a HUB STATUS tab in the Master Macro Scorecard
+#   - Never touches any other tab. Never places or blocks a trade.
+#
+# NO SCHEDULE ON PURPOSE: click "Run workflow" on the Actions tab.
+# (Tick "Dry run" to see the result in the log without writing anything.)
+#
+# SECRET NEEDED: GOOGLE_CREDENTIALS (already set for the other workflows)
+# ════════════════════════════════════════════════════════════════
+
+name: F4P Hub Freshness Status
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: print the result in the log, write nothing to the Sheet"
+        type: boolean
+        default: false
+
+jobs:
+  freshness-status:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-auth google-api-python-client
+
+      - name: Run freshness status
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: |
+          python f4p_freshness_status.py ${{ inputs.dry_run && '--dry-run' || '' }}
