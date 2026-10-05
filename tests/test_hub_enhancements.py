@@ -41,6 +41,10 @@ class ExposureTests(unittest.TestCase):
         r = ex.check_exposure([('EUR/USD', 'LONG'), ('USD/JPY', 'LONG'), ('GBP/USD', 'LONG')])
         self.assertFalse([w for w in r['warnings'] if w['level'] == 'BREACH'])
 
+    def test_no_concentration_watch_on_tiny_book(self):
+        r = ex.check_exposure([('EUR/USD', 'LONG')])
+        self.assertEqual(r['warnings'], [])
+
     def test_custom_limits(self):
         r = ex.check_exposure([('EUR/USD', 'SHORT'), ('GBP/USD', 'SHORT')],
                               {'max_same_direction_per_currency': 1})

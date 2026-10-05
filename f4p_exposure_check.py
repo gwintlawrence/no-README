@@ -22,6 +22,9 @@ DEFAULT_LIMITS = {
     'max_same_direction_per_currency': 2,
     # Share of total net exposure one currency may hold before it is a WATCH.
     'concentration_watch_pct': 35.0,
+    # Concentration is meaningless on a tiny book (one pair is always 50% per
+    # currency), so the WATCH only applies from this many ideas.
+    'concentration_min_ideas': 3,
 }
 
 
@@ -91,7 +94,7 @@ def check_exposure(ideas, limits=None):
                     'message': '%d %s ideas on %s exceed the limit of %d: %s' % (
                         n, side, ccy, lim['max_same_direction_per_currency'],
                         ', '.join(v[side + '_ideas']))})
-        if v['net_share_pct'] > lim['concentration_watch_pct']:
+        if len(ideas) >= lim['concentration_min_ideas'] and v['net_share_pct'] > lim['concentration_watch_pct']:
             warnings.append({
                 'level': 'WATCH', 'currency': ccy,
                 'message': '%s holds %.1f%% of net exposure (watch level %.0f%%)' % (
