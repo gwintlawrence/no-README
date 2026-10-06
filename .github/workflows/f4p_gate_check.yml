@@ -1,0 +1,81 @@
+# ════════════════════════════════════════════════════════════════
+# F4P TRADE DECISION GATE CHECK — MANUAL RUN ONLY
+# GWL Trading Team · Fishin4Pips System
+#
+# FILE LOCATION IN REPO: .github/workflows/f4p_gate_check.yml
+#
+# WHAT THIS DOES:
+#   - setup_idea_book: creates the empty IDEA BOOK tab (once; never touches
+#     an existing tab)
+#   - gate_check: reads your IDEA BOOK + live feed freshness, checks the new
+#     idea, writes the result to a GATE CHECK tab in the Master Macro Scorecard
+#
+# THE GATE CHECK FLAGS. THE ANALYST SIGNS OFF. It never blocks, places or
+# closes a trade, and it never writes into your IDEA BOOK.
+#
+# NO SCHEDULE ON PURPOSE: click "Run workflow" on the Actions tab.
+# SECRET NEEDED: GOOGLE_CREDENTIALS (already set)
+# ════════════════════════════════════════════════════════════════
+
+name: F4P Gate Check
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "What to do"
+        type: choice
+        options:
+          - gate_check
+          - setup_idea_book
+        default: gate_check
+      pair:
+        description: "Pair under consideration, e.g. USD/JPY (gate_check only)"
+        type: string
+        required: false
+      direction:
+        description: "LONG or SHORT (gate_check only)"
+        type: choice
+        options:
+          - LONG
+          - SHORT
+        default: LONG
+      dry_run:
+        description: "Dry run: print in the log, do not write the GATE CHECK tab"
+        type: boolean
+        default: false
+
+jobs:
+  gate-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-auth google-api-python-client
+
+      - name: Run
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          ACTION: ${{ inputs.action }}
+          PAIR: ${{ inputs.pair }}
+          DIRECTION: ${{ inputs.direction }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$ACTION" = "setup_idea_book" ]; then
+            python f4p_gate_check.py --init-idea-book
+          else
+            if [ -z "$PAIR" ]; then echo "Please type a pair, e.g. USD/JPY"; exit 1; fi
+            EXTRA=""
+            if [ "$DRY_RUN" = "true" ]; then EXTRA="--dry-run"; fi
+            python f4p_gate_check.py --live --pair "$PAIR" --direction "$DIRECTION" $EXTRA
+          fi
