@@ -11,8 +11,8 @@ Rules:
     PROBLEM and shown in the Gate Check, never silently skipped.
   * Closed ideas stay in the tab; they are the track record.
 
-Columns (row 1 is the header, ideas start on row 2). Times are UTC:
-Trinidad and Tobago is UTC-4, so add 4 hours to your local time.
+Columns (row 1 is the header, ideas start on row 2). Times are Trinidad and
+Tobago time (UTC-4, no daylight saving): type what your own clock says.
     A PAIR            e.g. USD/JPY
     B DIRECTION       LONG or SHORT
     C SELECTED AT     when you decided, e.g. 2026-10-06 19:30
@@ -25,7 +25,7 @@ Trinidad and Tobago is UTC-4, so add 4 hours to your local time.
 
 import json
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import f4p_exposure_check as ex
 import f4p_idea_lifecycle as lc
@@ -33,30 +33,54 @@ import f4p_idea_lifecycle as lc
 SPREADSHEET_ID = '18ZgUq7uvyodHSQvreVNoCQFiS7Ks6Gp89CBbIItcPO0'   # Master Macro Scorecard
 BOOK_TAB = 'IDEA BOOK'
 RESULT_TAB = 'GATE CHECK'
-HEADERS = ['PAIR', 'DIRECTION', 'SELECTED AT (UTC)', 'BASELINE PRICE', 'BASELINE TIME (UTC)',
-           'CLOSE PRICE', 'CLOSE TIME (UTC)', 'NOTES']
-HELP_TEXT = ('One row per idea. Times are UTC (Trinidad = UTC-4, add 4 hours). '
+TT = timezone(timedelta(hours=-4))        # Trinidad and Tobago: UTC-4 all year
+HEADERS = ['PAIR', 'DIRECTION', 'SELECTED AT (TT)', 'BASELINE PRICE', 'BASELINE TIME (TT)',
+           'CLOSE PRICE', 'CLOSE TIME (TT)', 'NOTES']
+HELP_TEXT = ('One row per idea. Times are Trinidad time (TT): type date AND time, e.g. 2026-10-06 12:00. '
              'Baseline = first verified quote AFTER you sign off; never back-fill it. '
              'Leave CLOSE blank while the idea is open.')
+_SHEETS_EPOCH = datetime(1899, 12, 30)
+_MIN_SERIAL = 40000        # about 2009; anything smaller is a stray number like 12, not a date
 
 
 def _cell(row, i):
-    return str(row[i]).strip() if i < len(row) and row[i] is not None else ''
+    """Raw cell: numbers stay numbers (dates arrive as serial numbers), text is stripped."""
+    v = row[i] if i < len(row) else ''
+    if v is None:
+        return ''
+    return v.strip() if isinstance(v, str) else v
 
 
-def _time(text):
-    """'2026-10-06 19:30' -> ISO text lifecycle accepts. UTC if no zone given."""
-    dt = datetime.fromisoformat(text.replace('Z', '+00:00'))
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    return dt.isoformat()
-
-
-def _price(text, label):
+def _time(value, label='time'):
+    """
+    Sheets date-times arrive as serial numbers (unambiguous). Typed ISO text is
+    also accepted. Anything without BOTH a date and a time is refused, never
+    guessed. Naive times are Trinidad time.
+    """
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        if value < _MIN_SERIAL or float(value) == int(value):
+            raise ValueError(label + ' needs a full date AND time, e.g. 2026-10-06 12:00 (got %r)' % value)
+        dt = _SHEETS_EPOCH + timedelta(days=float(value))
+        dt = dt.replace(second=0, microsecond=0) if dt.second < 30 else \
+            (dt + timedelta(minutes=1)).replace(second=0, microsecond=0)
+        return dt.replace(tzinfo=TT).isoformat()
+    text = str(value).strip().replace('Z', '+00:00')
     try:
-        return float(text.replace(',', ''))
+        dt = datetime.fromisoformat(text)
     except ValueError:
-        raise ValueError(label + ' is not a number: ' + repr(text))
+        raise ValueError(label + ' needs a full date AND time, e.g. 2026-10-06 12:00 (got %r)' % value)
+    if len(text) <= 10:
+        raise ValueError(label + ' has a date but no time (got %r)' % value)
+    return (dt if dt.tzinfo else dt.replace(tzinfo=TT)).isoformat()
+
+
+def _price(value, label):
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    try:
+        return float(str(value).replace(',', ''))
+    except ValueError:
+        raise ValueError(label + ' is not a number: ' + repr(value))
 
 
 def parse_book_rows(rows):
@@ -68,25 +92,26 @@ def parse_book_rows(rows):
     ideas, problems = [], []
     for n, row in enumerate(rows, start=2):
         cells = [_cell(row, i) for i in range(8)]
-        if not any(cells):
+        if all(c == '' for c in cells):
             continue
         where = 'IDEA BOOK row %d' % n
         try:
             pair, direction, sel = cells[0], cells[1], cells[2]
-            if not pair or not direction:
+            if pair == '' or direction == '':
                 raise ValueError('PAIR and DIRECTION are both needed')
+            pair, direction = str(pair), str(direction)
             ex.parse_pair(pair)
-            if not sel:
+            if sel == '':
                 raise ValueError('SELECTED AT is missing (not guessed)')
-            idea = lc.Idea(pair, direction, _time(sel), notes=cells[7])
-            if cells[3] or cells[4]:
-                if not (cells[3] and cells[4]):
+            idea = lc.Idea(pair, direction, _time(sel, 'SELECTED AT'), notes=str(cells[7]))
+            if cells[3] != '' or cells[4] != '':
+                if cells[3] == '' or cells[4] == '':
                     raise ValueError('BASELINE PRICE and BASELINE TIME must be filled together')
-                idea.record_baseline(_price(cells[3], 'BASELINE PRICE'), _time(cells[4]))
-            if cells[5] or cells[6]:
-                if not (cells[5] and cells[6]):
+                idea.record_baseline(_price(cells[3], 'BASELINE PRICE'), _time(cells[4], 'BASELINE TIME'))
+            if cells[5] != '' or cells[6] != '':
+                if cells[5] == '' or cells[6] == '':
                     raise ValueError('CLOSE PRICE and CLOSE TIME must be filled together')
-                idea.close(_price(cells[5], 'CLOSE PRICE'), _time(cells[6]))
+                idea.close(_price(cells[5], 'CLOSE PRICE'), _time(cells[6], 'CLOSE TIME'))
             ideas.append(idea)
         except ValueError as e:
             problems.append(where + ': ' + str(e))
@@ -138,7 +163,8 @@ def read_book(svc):
     """Returns (ideas, problems). Read only."""
     try:
         resp = svc.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID, range="'" + BOOK_TAB + "'!A2:H500").execute()
+            spreadsheetId=SPREADSHEET_ID, range="'" + BOOK_TAB + "'!A2:H500",
+            valueRenderOption='UNFORMATTED_VALUE', dateTimeRenderOption='SERIAL_NUMBER').execute()
     except Exception as e:
         return [], ['Could not read the IDEA BOOK tab (' + type(e).__name__ + '). '
                     'Run the setup step first if the tab does not exist yet.']

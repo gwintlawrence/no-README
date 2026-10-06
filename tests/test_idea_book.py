@@ -21,6 +21,26 @@ class ParseBookTests(unittest.TestCase):
         self.assertEqual([i.state for i in ideas], ['ACTIVE', 'ACTIVE', 'CLOSED'])
         self.assertEqual(ideas[2].result_pips(), 60.0)
 
+    def test_sheets_serial_numbers_and_trinidad_time(self):
+        # 2026-10-06 12:00 = serial 46301.5 ; Trinidad time is UTC-4
+        ideas, problems = ib.parse_book_rows([['EUR/USD', 'SHORT', 46301.5, 1.1265, 46301.5]])
+        self.assertEqual(problems, [])
+        self.assertEqual(ideas[0].selected_at, '2026-10-06T12:00:00-04:00')
+        self.assertEqual(ideas[0].baseline_price, 1.1265)
+
+    def test_her_first_attempt_is_flagged_clearly(self):
+        # '12' typed alone and '12:00' typed alone: a time with no date is never guessed
+        rows = [['EUR/USD', 'SHORT', 12, 1.1265], ['GBP/USD', 'SHORT', 0.5, 1.328]]
+        ideas, problems = ib.parse_book_rows(rows)
+        self.assertEqual(ideas, [])
+        self.assertEqual(len(problems), 2)
+        self.assertIn('full date AND time', problems[0])
+
+    def test_date_without_time_is_refused(self):
+        ideas, problems = ib.parse_book_rows([['EUR/USD', 'SHORT', 46301]])
+        self.assertEqual(ideas, [])
+        self.assertIn('full date AND time', problems[0])
+
     def test_pending_baseline_is_allowed(self):
         ideas, problems = ib.parse_book_rows([['USD/JPY', 'LONG', '2026-10-06 19:30']])
         self.assertEqual((problems, ideas[0].state), ([], 'PENDING_BASELINE'))
