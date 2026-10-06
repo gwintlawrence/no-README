@@ -8,7 +8,10 @@ CARDINAL RULE: the Gate Check flags; the analyst signs off. `blocks_trade` is
 always False and nothing here places, vetoes or closes a trade. The packet
 carries an `analyst_signoff` field that stays None until a person fills it in.
 
-Usage (no live access needed):
+Live (reads your IDEA BOOK tab and the freshness of the feeds):
+    python f4p_gate_check.py --live --pair USD/JPY --direction LONG [--dry-run]
+
+Without a Sheet (types the open ideas in by hand):
     python f4p_gate_check.py --pair EUR/USD --direction SHORT \
         --open "GBP/USD:SHORT,USD/JPY:LONG" --html gate_check.html
 
@@ -29,11 +32,14 @@ def _warning_keys(result):
 
 
 def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
-                      prices=None, close_rules=(), now=None):
+                      prices=None, close_rules=(), now=None, book_problems=()):
     """
     candidate:   (pair, direction) being considered.
     open_ideas:  lifecycle.Idea objects already on the book (any state).
     freshness:   result of f4p_freshness_status.evaluate(), or None.
+    book_problems: rows of the IDEA BOOK that could not be read. Any problem is
+                 shown as a flag, because an unreadable row means the exposure
+                 picture may be incomplete.
     prices:      {pair: current price} used only to show pips and close flags.
     close_rules: your own rules (see lifecycle.adverse_pips_rule); flag only.
     """
@@ -72,6 +78,9 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
          'ok': True,
          'note': 'Baseline is the first verified quote after sign-off. It is never back-filled.'},
     ]
+    if book_problems:
+        checks.insert(1, {'item': 'Idea book', 'status': 'PROBLEM', 'ok': False,
+                          'note': 'Exposure may be incomplete. ' + ' | '.join(book_problems)})
     flagged = [c for c in checks if not c['ok']]
     return {
         'generated_at': now.strftime('%Y-%m-%d %H:%M UTC'),
@@ -136,15 +145,50 @@ def _parse_open(text):
     return out
 
 
+def _live_freshness(svc):
+    import f4p_freshness_status as fs
+
+    def read_range(tab, a1):
+        resp = svc.spreadsheets().values().get(
+            spreadsheetId=fs.SPREADSHEET_ID, range="'" + tab + "'!" + a1).execute()
+        return [c for row in resp.get('values', []) for c in row]
+    return fs.evaluate(fs.SOURCES, read_range)
+
+
 def main():
     ap = argparse.ArgumentParser(description='F4P Trade Decision Gate Check (flags only)')
-    ap.add_argument('--pair', required=True)
-    ap.add_argument('--direction', required=True)
-    ap.add_argument('--open', default='', help='open ideas, e.g. "GBP/USD:SHORT,USD/JPY:LONG"')
+    ap.add_argument('--pair')
+    ap.add_argument('--direction')
+    ap.add_argument('--open', default='', help='open ideas by hand, e.g. "GBP/USD:SHORT,USD/JPY:LONG"')
     ap.add_argument('--html', help='also write a standalone HTML page here')
+    ap.add_argument('--live', action='store_true',
+                    help='read your IDEA BOOK and live freshness from the Sheet; write the GATE CHECK tab')
+    ap.add_argument('--dry-run', action='store_true', help='with --live: print only, write nothing')
+    ap.add_argument('--init-idea-book', action='store_true',
+                    help='create the empty IDEA BOOK tab (never touches an existing one)')
     a = ap.parse_args()
-    packet = build_gate_packet((a.pair, a.direction), _parse_open(a.open))
-    print(format_packet(packet))
+
+    if a.init_idea_book:
+        import f4p_idea_book as ib
+        print(ib.init_idea_book(ib._service()))
+        return
+    if not (a.pair and a.direction):
+        ap.error('--pair and --direction are required')
+
+    if a.live:
+        import f4p_idea_book as ib
+        svc = ib._service()
+        ideas, problems = ib.read_book(svc)
+        packet = build_gate_packet((a.pair, a.direction), ideas, _live_freshness(svc),
+                                   book_problems=problems)
+        text = format_packet(packet) + '\n\nIdeas read from IDEA BOOK: %d' % len(ideas)
+        print(text)
+        if not a.dry_run:
+            ib.write_result_tab(svc, text)
+            print('Wrote the ' + ib.RESULT_TAB + ' tab.')
+    else:
+        packet = build_gate_packet((a.pair, a.direction), _parse_open(a.open))
+        print(format_packet(packet))
     if a.html:
         with open(a.html, 'w', encoding='utf-8') as f:
             f.write(render_html(packet))
