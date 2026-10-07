@@ -43,12 +43,18 @@ def pip_value_usd_per_lot(pair, price=None):
     raise ValueError('cross pair: needs a USD conversion rate, so risk is not computed')
 
 
-def stop_distance_pips(pair, direction, entry, stop):
+def stop_distance_pips(pair, direction, entry, stop, filled=False):
+    """
+    Pips from entry to stop. Positive = stop still risks money.
+    For a trade that has FILLED, a stop at or beyond the entry on the profit
+    side (break-even or a trailed stop) is legitimate: zero or negative here
+    means no open risk. For an unfilled order it is a mistake, so it is refused.
+    """
     sign = 1 if direction.strip().upper() == 'LONG' else -1
-    pips = (float(entry) - float(stop)) / lc.pip_size(pair) * sign
-    if pips <= 0:
+    pips = round((float(entry) - float(stop)) / lc.pip_size(pair) * sign, 1)
+    if pips <= 0 and not filled:
         raise ValueError('stop is on the wrong side of the entry for a %s' % direction.upper())
-    return round(pips, 1)
+    return pips
 
 
 def target_distance_pips(pair, direction, entry, target):
@@ -70,13 +76,19 @@ def trade_risk(trade, limits=None):
     lots = float(trade['lots'])
     if lots <= 0:
         raise ValueError('lot size must be above zero')
-    pips = stop_distance_pips(trade['pair'], trade['direction'], trade['entry'], trade['stop'])
+    filled = bool(trade.get('filled'))
+    pips = stop_distance_pips(trade['pair'], trade['direction'], trade['entry'], trade['stop'], filled)
+    if pips <= 0:
+        # Filled trade with the stop at break-even or better: nothing left at
+        # risk (spread, slippage and gaps aside).
+        return {'label': trade['label'], 'lots': lots, 'stop_pips': pips, 'risk_usd': 0.0,
+                'risk_pct': 0.0, 'rr': None, 'locked_pips': -pips}
     per_pip = pip_value_usd_per_lot(trade['pair'], trade['entry']) * lots
     risk = round(pips * per_pip, 2)
     out = {'label': trade['label'], 'lots': lots, 'stop_pips': pips,
            'risk_usd': risk,
            'risk_pct': round(100.0 * risk / lim['account_size_usd'], 2),
-           'rr': None}
+           'rr': None, 'locked_pips': 0.0}
     if trade.get('target') not in (None, ''):
         out['rr'] = round(target_distance_pips(trade['pair'], trade['direction'],
                                                trade['entry'], trade['target']) / pips, 2)
@@ -115,6 +127,10 @@ def format_risk(result):
     lines = ['RISK CHECK (flags only, analyst decides; rule %.1f%% of $%.0f)' % (
         result['limits']['max_risk_pct_per_trade'], result['limits']['account_size_usd'])]
     for r in result['rows']:
+        if r['stop_pips'] <= 0:
+            lines.append('  %-16s %.2f lots, stop at break-even or better (locks %.1f pips): no open risk' % (
+                r['label'], r['lots'], r['locked_pips']))
+            continue
         extra = ', reward:risk %.2f' % r['rr'] if r['rr'] is not None else ''
         lines.append('  %-16s %.2f lots, stop %.1f pips: $%.2f (%.1f%%)%s' % (
             r['label'], r['lots'], r['stop_pips'], r['risk_usd'], r['risk_pct'], extra))

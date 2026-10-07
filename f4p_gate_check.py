@@ -77,7 +77,8 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
             continue
         trades.append({'label': '%s %s' % (i.pair, i.direction), 'pair': i.pair, 'direction': i.direction,
                        'entry': i.baseline_price if i.baseline_price is not None else i.entry_price,
-                       'stop': i.stop_price, 'lots': i.lots, 'target': i.target_price})
+                       'stop': i.stop_price, 'lots': i.lots, 'target': i.target_price,
+                       'filled': i.baseline_price is not None})
     ct = candidate_trade or {}
     trades.append({'label': '%s %s (new)' % (pair, direction.strip().upper()), 'pair': pair,
                    'direction': direction, 'entry': ct.get('entry'), 'stop': ct.get('stop'),
