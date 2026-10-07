@@ -181,7 +181,7 @@ def _live_freshness(svc):
         resp = svc.spreadsheets().values().get(
             spreadsheetId=fs.SPREADSHEET_ID, range="'" + tab + "'!" + a1).execute()
         return [c for row in resp.get('values', []) for c in row]
-    return fs.evaluate(fs.SOURCES, read_range)
+    return fs.evaluate(fs.FX_SOURCES, read_range)
 
 
 def main():

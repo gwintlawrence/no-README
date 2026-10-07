@@ -14,15 +14,21 @@ Usage:   python f4p_freshness_status.py            # read, classify, write tab
          python f4p_freshness_status.py --dry-run  # print only, no write
 Env:     GOOGLE_CREDENTIALS (same secret the other scripts use)
 
-Only feeds whose layout is confirmed in the repo are listed in SOURCES. Add
-the Equities Sheet feeds the same way once their timestamp cells are chosen.
+Only feeds whose layout is confirmed in the repo are listed in SOURCES.
+
+Equities: the weekly Alpha Vantage step appends a dated row per ticker to the
+OPTIONS FLOW & IV tab of the separate Equities spreadsheet (secret
+EQUITIES_SHEET_ID), so the NEWEST date in its column A is when that step last
+ran. If EQUITIES_SHEET_ID is not available the feed is UNKNOWN, never CURRENT.
+The Claude research step (qualitative) has no timestamp cell of its own and is
+not covered.
 """
 
 import argparse
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 SPREADSHEET_ID = '18ZgUq7uvyodHSQvreVNoCQFiS7Ks6Gp89CBbIItcPO0'   # Master Macro Scorecard
 STATUS_TAB = 'HUB STATUS'
@@ -36,7 +42,16 @@ SOURCES = [
      'current_hours': 36, 'stale_hours': 72},                 # fetched daily
     {'name': 'COT positioning', 'tab': 'FRED AUTO', 'range': 'E18:E25', 'kind': 'as_of_dates',
      'current_hours': 10 * 24, 'stale_hours': 17 * 24},       # weekly, as-of is the prior Tuesday
+    # kind 'latest_date': history accumulates down the column; the NEWEST date decides.
+    {'name': 'Equities weekly run', 'tab': 'OPTIONS FLOW & IV', 'range': 'A2:A5000',
+     'kind': 'latest_date', 'spreadsheet_env': 'EQUITIES_SHEET_ID',
+     'current_hours': 9 * 24, 'stale_hours': 16 * 24},        # runs Saturdays
 ]
+
+# The FX decision screens (Gate Check) only care about the FX feeds, which all
+# live in the Master Macro Scorecard. A stale equities feed must not mark an FX
+# idea, but it does count toward the overall Hub badge.
+FX_SOURCES = [s for s in SOURCES if 'spreadsheet_env' not in s]
 
 # '%y%m%d' is the COT AS OF DATE format on FRED AUTO (e.g. 260922 = 2026-09-22).
 _DATE_FORMATS = ('%Y-%m-%d', '%m/%d/%Y', '%d %b %Y', '%Y/%m/%d', '%y%m%d')
@@ -49,8 +64,19 @@ def parse_run_stamp(text):
     return datetime.strptime(m.group(1) + ' ' + m.group(2), '%Y-%m-%d %H:%M').replace(tzinfo=timezone.utc)
 
 
+_SHEETS_EPOCH = datetime(1899, 12, 30)
+
+
 def parse_date(text):
+    # Sheets date cells read unformatted arrive as serial numbers (locale-proof).
+    if isinstance(text, (int, float)) and not isinstance(text, bool):
+        if 40000 <= text < 80000:
+            return (_SHEETS_EPOCH + timedelta(days=float(text))).replace(
+                hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc)
+        return None
     t = (text or '').strip()
+    if re.fullmatch(r'\d{5}(\.\d+)?', t):
+        return parse_date(float(t))
     for fmt in _DATE_FORMATS:
         try:
             return datetime.strptime(t, fmt).replace(tzinfo=timezone.utc)
@@ -80,9 +106,14 @@ def overall(statuses):
 
 def source_timestamp(source, values):
     """values: list of cell strings from the source's range."""
-    cells = [c for c in values if c and str(c).strip()]
+    cells = [c for c in values if c is not None and str(c).strip()]
     if source['kind'] == 'run_stamp':
         return parse_run_stamp(cells[0]) if cells else None
+    if source['kind'] == 'latest_date':
+        # Unreadable cells are ignored: that can only make the feed look OLDER
+        # (stale), never fresher than it is. No readable date at all is UNKNOWN.
+        good = [d for d in (parse_date(c) for c in cells) if d is not None]
+        return max(good) if good else None
     dates = [parse_date(c) for c in cells]
     if not dates or any(d is None for d in dates):
         return None            # one unreadable date makes the whole feed UNKNOWN
@@ -95,7 +126,11 @@ def evaluate(sources, read_range, now=None):
     rows = []
     for s in sources:
         try:
-            ts = source_timestamp(s, read_range(s['tab'], s['range']))
+            if s.get('spreadsheet_env'):
+                cells = read_range(s['tab'], s['range'], s['spreadsheet_env'])
+            else:
+                cells = read_range(s['tab'], s['range'])
+            ts = source_timestamp(s, cells)
         except Exception:
             ts = None
         rows.append({
@@ -124,9 +159,17 @@ def main():
 
     svc = _service()
 
-    def read_range(tab, a1):
-        resp = svc.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID, range="'" + tab + "'!" + a1).execute()
+    def read_range(tab, a1, spreadsheet_env=None):
+        if spreadsheet_env:
+            sheet_id = os.environ.get(spreadsheet_env, '').strip()
+            if not sheet_id:
+                raise RuntimeError(spreadsheet_env + ' is not set')       # evaluate() reports UNKNOWN
+            resp = svc.spreadsheets().values().get(
+                spreadsheetId=sheet_id, range="'" + tab + "'!" + a1,
+                valueRenderOption='UNFORMATTED_VALUE', dateTimeRenderOption='SERIAL_NUMBER').execute()
+        else:
+            resp = svc.spreadsheets().values().get(
+                spreadsheetId=SPREADSHEET_ID, range="'" + tab + "'!" + a1).execute()
         return [c for row in resp.get('values', []) for c in row]
 
     result = evaluate(SOURCES, read_range)

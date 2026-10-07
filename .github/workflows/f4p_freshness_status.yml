@@ -5,7 +5,8 @@
 # FILE LOCATION IN REPO: .github/workflows/f4p_freshness_status.yml
 #
 # WHAT THIS DOES:
-#   - Reads the timestamps the pipeline already wrote to FRED AUTO
+#   - Reads the timestamps the pipeline already wrote to FRED AUTO, and the
+#     newest dated row on the Equities sheet (OPTIONS FLOW & IV)
 #   - Labels each feed CURRENT / DELAYED / STALE / UNKNOWN
 #   - Writes the result to a HUB STATUS tab in the Master Macro Scorecard
 #   - Never touches any other tab. Never places or blocks a trade.
@@ -13,7 +14,8 @@
 # NO SCHEDULE ON PURPOSE: click "Run workflow" on the Actions tab.
 # (Tick "Dry run" to see the result in the log without writing anything.)
 #
-# SECRET NEEDED: GOOGLE_CREDENTIALS (already set for the other workflows)
+# SECRETS NEEDED: GOOGLE_CREDENTIALS and EQUITIES_SHEET_ID (both already set
+# for the other workflows)
 # ════════════════════════════════════════════════════════════════
 
 name: F4P Hub Freshness Status
@@ -47,5 +49,6 @@ jobs:
       - name: Run freshness status
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
         run: |
           python f4p_freshness_status.py ${{ inputs.dry_run && '--dry-run' || '' }}
