@@ -1,0 +1,54 @@
+# ════════════════════════════════════════════════════════════════
+# F4P IDEA REVIEW — TRACK RECORD OF CLOSED IDEAS
+# GWL Trading Team · Fishin4Pips System
+#
+# FILE LOCATION IN REPO: .github/workflows/f4p_idea_review.yml
+#
+# WHAT THIS DOES: reads the IDEA BOOK (read only) and works out, for each
+# closed idea: pips, dollars, R (result vs the stop you planned) and whether
+# the size stayed inside the 2% rule. Writes a summary to the 'IDEA REVIEW'
+# tab. It never touches the IDEA BOOK and never blocks or places a trade.
+#
+# MANUAL ONLY (no schedule). Actions tab > Run workflow.
+# Tick Dry run to only print the result in the log, with no write.
+#
+# SECRETS NEEDED: GOOGLE_CREDENTIALS (already set)
+# ════════════════════════════════════════════════════════════════
+
+name: F4P Idea Review
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: only print. Do not write the IDEA REVIEW tab."
+        type: boolean
+        default: true
+
+jobs:
+  idea-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install google-auth google-auth-oauthlib google-api-python-client
+
+      - name: Run Idea Review
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            python f4p_idea_review.py --dry-run
+          else
+            python f4p_idea_review.py
+          fi
