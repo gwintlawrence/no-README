@@ -87,6 +87,7 @@ jobs:
         if: always() && inputs.dry_run != true
         env:
           GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          EQUITIES_SHEET_ID: ${{ secrets.EQUITIES_SHEET_ID }}
         run: |
           python f4p_freshness_status.py
 

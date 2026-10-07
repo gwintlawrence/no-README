@@ -144,7 +144,7 @@ class FreshnessTests(unittest.TestCase):
             ('FRED AUTO', 'A1'): ['F4P MACRO DATA - Last run: 2026-10-05 22:31 UTC'],
             ('FRED AUTO', 'E18:E25'): ['2026-09-29', '2026-09-29'],
         }
-        r = fs.evaluate(fs.SOURCES, lambda tab, a1: data[(tab, a1)], self.NOW)
+        r = fs.evaluate(fs.FX_SOURCES, lambda tab, a1: data[(tab, a1)], self.NOW)
         self.assertEqual([x['status'] for x in r['sources']], ['CURRENT', 'CURRENT'])
         self.assertEqual(r['overall'], 'CURRENT')
 
