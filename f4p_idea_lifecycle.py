@@ -45,6 +45,10 @@ class Idea:
     closed_price: Optional[float] = None
     closed_at: Optional[str] = None
     notes: str = ''                     # analyst's decision notes
+    entry_price: Optional[float] = None   # planned/pending order price (not a baseline)
+    stop_price: Optional[float] = None
+    target_price: Optional[float] = None
+    lots: Optional[float] = None
     history: List[dict] = field(default_factory=list)
 
     def __post_init__(self):

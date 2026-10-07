@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 import f4p_exposure_check as ex
 import f4p_idea_lifecycle as lc
+import f4p_risk_check as rk
 
 
 def _warning_keys(result):
@@ -32,7 +33,8 @@ def _warning_keys(result):
 
 
 def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
-                      prices=None, close_rules=(), now=None, book_problems=()):
+                      prices=None, close_rules=(), now=None, book_problems=(),
+                      candidate_trade=None, risk_limits=None):
     """
     candidate:   (pair, direction) being considered.
     open_ideas:  lifecycle.Idea objects already on the book (any state).
@@ -40,6 +42,8 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
     book_problems: rows of the IDEA BOOK that could not be read. Any problem is
                  shown as a flag, because an unreadable row means the exposure
                  picture may be incomplete.
+    candidate_trade: {'entry','stop','lots','target'(optional)} for the new idea.
+                 Without entry, stop and lots its risk is NOT CHECKED, never assumed safe.
     prices:      {pair: current price} used only to show pips and close flags.
     close_rules: your own rules (see lifecycle.adverse_pips_rule); flag only.
     """
@@ -67,6 +71,27 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
             'close_flags': lc.check_close(i, px, close_rules) if px is not None else [],
         })
 
+    trades = []
+    for i in open_ideas:
+        if i.state == 'CLOSED':
+            continue
+        trades.append({'label': '%s %s' % (i.pair, i.direction), 'pair': i.pair, 'direction': i.direction,
+                       'entry': i.baseline_price if i.baseline_price is not None else i.entry_price,
+                       'stop': i.stop_price, 'lots': i.lots, 'target': i.target_price})
+    ct = candidate_trade or {}
+    trades.append({'label': '%s %s (new)' % (pair, direction.strip().upper()), 'pair': pair,
+                   'direction': direction, 'entry': ct.get('entry'), 'stop': ct.get('stop'),
+                   'lots': ct.get('lots'), 'target': ct.get('target')})
+    risk = rk.check_risk(trades, risk_limits)
+    if risk['flags']:
+        risk_status = 'FLAGGED'
+    elif risk['not_checked']:
+        risk_status = 'NOT CHECKED'
+    else:
+        risk_status = 'WITHIN RULE'
+    risk_note = ' | '.join(risk['flags'] + risk['not_checked']) or (
+        'All ideas within your %.1f%% rule.' % risk['limits']['max_risk_pct_per_trade'])
+
     checks = [
         {'item': 'Data freshness', 'status': fresh_overall,
          'ok': fresh_overall == 'CURRENT',
@@ -74,6 +99,8 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
         {'item': 'Exposure after this idea', 'status': 'FLAGGED' if new_flags else 'CLEAR',
          'ok': not new_flags,
          'note': '; '.join(w['message'] for w in new_flags) or 'No new limit flags.'},
+        {'item': 'Risk per trade', 'status': risk_status, 'ok': risk_status == 'WITHIN RULE',
+         'note': risk_note},
         {'item': 'Baseline plan', 'status': 'PENDING',
          'ok': True,
          'note': 'Baseline is the first verified quote after sign-off. It is never back-filled.'},
@@ -89,6 +116,7 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
         'summary': 'REVIEW %d FLAG(S) BEFORE SIGN-OFF' % len(flagged) if flagged
                    else 'NO FLAGS - ANALYST STILL SIGNS OFF',
         'exposure_after': after,
+        'risk': risk,
         'new_exposure_flags': new_flags,
         'freshness': freshness,
         'open_book': book,
@@ -103,7 +131,7 @@ def format_packet(p):
              p['summary'], '']
     for c in p['checks']:
         lines.append('  [%-8s] %s - %s' % (c['status'], c['item'], c['note']))
-    lines += ['', ex.format_report(p['exposure_after']), '',
+    lines += ['', ex.format_report(p['exposure_after']), '', rk.format_risk(p['risk']), '',
               'Analyst sign-off: ______  (the system never signs off)']
     return '\n'.join(lines)
 
@@ -160,6 +188,10 @@ def main():
     ap.add_argument('--pair')
     ap.add_argument('--direction')
     ap.add_argument('--open', default='', help='open ideas by hand, e.g. "GBP/USD:SHORT,USD/JPY:LONG"')
+    ap.add_argument('--entry', type=float, help='planned entry price of the new idea (for the risk check)')
+    ap.add_argument('--stop', type=float, help='stop price of the new idea')
+    ap.add_argument('--target', type=float, help='target price of the new idea (optional)')
+    ap.add_argument('--lots', type=float, help='lot size of the new idea')
     ap.add_argument('--html', help='also write a standalone HTML page here')
     ap.add_argument('--live', action='store_true',
                     help='read your IDEA BOOK and live freshness from the Sheet; write the GATE CHECK tab')
@@ -175,19 +207,21 @@ def main():
     if not (a.pair and a.direction):
         ap.error('--pair and --direction are required')
 
+    cand = {'entry': a.entry, 'stop': a.stop, 'target': a.target, 'lots': a.lots}
+
     if a.live:
         import f4p_idea_book as ib
         svc = ib._service()
         ideas, problems = ib.read_book(svc)
         packet = build_gate_packet((a.pair, a.direction), ideas, _live_freshness(svc),
-                                   book_problems=problems)
+                                   book_problems=problems, candidate_trade=cand)
         text = format_packet(packet) + '\n\nIdeas read from IDEA BOOK: %d' % len(ideas)
         print(text)
         if not a.dry_run:
             ib.write_result_tab(svc, text)
             print('Wrote the ' + ib.RESULT_TAB + ' tab.')
     else:
-        packet = build_gate_packet((a.pair, a.direction), _parse_open(a.open))
+        packet = build_gate_packet((a.pair, a.direction), _parse_open(a.open), candidate_trade=cand)
         print(format_packet(packet))
     if a.html:
         with open(a.html, 'w', encoding='utf-8') as f:

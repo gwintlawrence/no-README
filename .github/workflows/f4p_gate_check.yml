@@ -40,6 +40,22 @@ on:
           - LONG
           - SHORT
         default: LONG
+      entry:
+        description: "New idea: planned entry price (for the risk check; leave blank to skip)"
+        type: string
+        required: false
+      stop:
+        description: "New idea: stop price"
+        type: string
+        required: false
+      target:
+        description: "New idea: target price (optional)"
+        type: string
+        required: false
+      lots:
+        description: "New idea: lot size, e.g. 0.02"
+        type: string
+        required: false
       dry_run:
         description: "Dry run: print in the log, do not write the GATE CHECK tab"
         type: boolean
@@ -69,6 +85,10 @@ jobs:
           ACTION: ${{ inputs.action }}
           PAIR: ${{ inputs.pair }}
           DIRECTION: ${{ inputs.direction }}
+          ENTRY: ${{ inputs.entry }}
+          STOP: ${{ inputs.stop }}
+          TARGET: ${{ inputs.target }}
+          LOTS: ${{ inputs.lots }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: |
           if [ "$ACTION" = "setup_idea_book" ]; then
@@ -77,5 +97,10 @@ jobs:
             if [ -z "$PAIR" ]; then echo "Please type a pair, e.g. USD/JPY"; exit 1; fi
             EXTRA=""
             if [ "$DRY_RUN" = "true" ]; then EXTRA="--dry-run"; fi
-            python f4p_gate_check.py --live --pair "$PAIR" --direction "$DIRECTION" $EXTRA
+            RISK=""
+            if [ -n "$ENTRY" ]; then RISK="$RISK --entry $ENTRY"; fi
+            if [ -n "$STOP" ]; then RISK="$RISK --stop $STOP"; fi
+            if [ -n "$TARGET" ]; then RISK="$RISK --target $TARGET"; fi
+            if [ -n "$LOTS" ]; then RISK="$RISK --lots $LOTS"; fi
+            python f4p_gate_check.py --live --pair "$PAIR" --direction "$DIRECTION" $EXTRA $RISK
           fi

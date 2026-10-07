@@ -1,0 +1,126 @@
+"""
+F4P Risk Check  (Hub enhancement #3 companion: size, not just direction)
+
+Checks the money at risk on each idea against Glenise's own rule:
+standard risk is 2% of the account per trade (2% of $500 = $10).
+
+FLAGS ONLY. Under the Cardinal Rule nothing here blocks, resizes or cancels
+an order; `blocks_trade` is always False and the analyst decides.
+
+Honest limits:
+  * Risk is computed only when entry, stop and lots are all known. Anything
+    missing is reported as NOT CHECKED, never treated as safe.
+  * USD-quoted pairs (EUR/USD, GBP/USD, AUD/USD, NZD/USD) and USD-based pairs
+    (USD/JPY, USD/CAD, USD/CHF, USD/NOK, USD/SEK) are supported. A cross such as
+    EUR/GBP needs a conversion rate this module does not have, so it is
+    reported as NOT CHECKED rather than guessed.
+  * Pip value is a standard-lot approximation (1 lot = 100,000 units). Your
+    broker's own contract size and spread can differ slightly.
+"""
+
+import f4p_exposure_check as ex
+import f4p_idea_lifecycle as lc
+
+LOT_UNITS = 100000
+
+# Glenise's own rule. Change in one place, or pass your own.
+DEFAULT_RISK = {
+    'account_size_usd': 500.0,
+    'max_risk_pct_per_trade': 2.0,
+}
+
+
+def pip_value_usd_per_lot(pair, price=None):
+    """USD value of one pip on a 1.0 lot position."""
+    base, quote = ex.parse_pair(pair)
+    pip = lc.pip_size(pair)
+    if quote == 'USD':
+        return LOT_UNITS * pip
+    if base == 'USD':
+        if not price:
+            raise ValueError('needs the entry price to convert the pip value')
+        return LOT_UNITS * pip / float(price)
+    raise ValueError('cross pair: needs a USD conversion rate, so risk is not computed')
+
+
+def stop_distance_pips(pair, direction, entry, stop):
+    sign = 1 if direction.strip().upper() == 'LONG' else -1
+    pips = (float(entry) - float(stop)) / lc.pip_size(pair) * sign
+    if pips <= 0:
+        raise ValueError('stop is on the wrong side of the entry for a %s' % direction.upper())
+    return round(pips, 1)
+
+
+def target_distance_pips(pair, direction, entry, target):
+    sign = 1 if direction.strip().upper() == 'LONG' else -1
+    return round((float(target) - float(entry)) / lc.pip_size(pair) * sign, 1)
+
+
+def trade_risk(trade, limits=None):
+    """
+    trade: {'label','pair','direction','entry','stop','lots', 'target' (optional)}
+    Returns a result dict; raises ValueError with a plain reason if it cannot
+    be computed.
+    """
+    lim = dict(DEFAULT_RISK)
+    lim.update(limits or {})
+    for k in ('entry', 'stop', 'lots'):
+        if trade.get(k) in (None, ''):
+            raise ValueError('%s is missing' % {'entry': 'entry price', 'stop': 'stop price', 'lots': 'lot size'}[k])
+    lots = float(trade['lots'])
+    if lots <= 0:
+        raise ValueError('lot size must be above zero')
+    pips = stop_distance_pips(trade['pair'], trade['direction'], trade['entry'], trade['stop'])
+    per_pip = pip_value_usd_per_lot(trade['pair'], trade['entry']) * lots
+    risk = round(pips * per_pip, 2)
+    out = {'label': trade['label'], 'lots': lots, 'stop_pips': pips,
+           'risk_usd': risk,
+           'risk_pct': round(100.0 * risk / lim['account_size_usd'], 2),
+           'rr': None}
+    if trade.get('target') not in (None, ''):
+        out['rr'] = round(target_distance_pips(trade['pair'], trade['direction'],
+                                               trade['entry'], trade['target']) / pips, 2)
+    return out
+
+
+def check_risk(trades, limits=None):
+    """
+    Returns {'rows': [...], 'flags': [...], 'not_checked': [...],
+             'total_risk_usd', 'total_risk_pct', 'blocks_trade': False, 'limits'}.
+    """
+    lim = dict(DEFAULT_RISK)
+    lim.update(limits or {})
+    rows, flags, not_checked = [], [], []
+    for t in trades:
+        try:
+            r = trade_risk(t, lim)
+        except ValueError as e:
+            not_checked.append('%s: %s' % (t.get('label', '?'), e))
+            continue
+        rows.append(r)
+        if r['risk_pct'] > lim['max_risk_pct_per_trade']:
+            flags.append('%s risks $%.2f (%.1f%% of the account), above your %.1f%% rule ($%.2f). '
+                         'About %.2f lots would match the rule.' % (
+                             r['label'], r['risk_usd'], r['risk_pct'], lim['max_risk_pct_per_trade'],
+                             lim['account_size_usd'] * lim['max_risk_pct_per_trade'] / 100.0,
+                             r['lots'] * lim['max_risk_pct_per_trade'] / r['risk_pct']))
+    total = round(sum(r['risk_usd'] for r in rows), 2)
+    return {'rows': rows, 'flags': flags, 'not_checked': not_checked,
+            'total_risk_usd': total,
+            'total_risk_pct': round(100.0 * total / lim['account_size_usd'], 2),
+            'blocks_trade': False, 'limits': lim}
+
+
+def format_risk(result):
+    lines = ['RISK CHECK (flags only, analyst decides; rule %.1f%% of $%.0f)' % (
+        result['limits']['max_risk_pct_per_trade'], result['limits']['account_size_usd'])]
+    for r in result['rows']:
+        extra = ', reward:risk %.2f' % r['rr'] if r['rr'] is not None else ''
+        lines.append('  %-16s %.2f lots, stop %.1f pips: $%.2f (%.1f%%)%s' % (
+            r['label'], r['lots'], r['stop_pips'], r['risk_usd'], r['risk_pct'], extra))
+    if result['rows']:
+        lines.append('  If everything triggers and stops out: $%.2f (%.1f%% of the account)' % (
+            result['total_risk_usd'], result['total_risk_pct']))
+    lines += ['  [FLAG] ' + f for f in result['flags']]
+    lines += ['  [NOT CHECKED] ' + n for n in result['not_checked']]
+    return '\n'.join(lines)

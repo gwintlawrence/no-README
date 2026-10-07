@@ -21,6 +21,11 @@ Tobago time (UTC-4, no daylight saving): type what your own clock says.
     F CLOSE PRICE     blank while the idea is open
     G CLOSE TIME      blank while the idea is open
     H NOTES           your decision notes
+  Optional, used by the risk check (blank = risk NOT CHECKED, never assumed safe):
+    I ENTRY PRICE     your planned/pending order price
+    J STOP PRICE
+    K TARGET PRICE
+    L LOTS
 """
 
 import json
@@ -35,7 +40,8 @@ BOOK_TAB = 'IDEA BOOK'
 RESULT_TAB = 'GATE CHECK'
 TT = timezone(timedelta(hours=-4))        # Trinidad and Tobago: UTC-4 all year
 HEADERS = ['PAIR', 'DIRECTION', 'SELECTED AT (TT)', 'BASELINE PRICE', 'BASELINE TIME (TT)',
-           'CLOSE PRICE', 'CLOSE TIME (TT)', 'NOTES']
+           'CLOSE PRICE', 'CLOSE TIME (TT)', 'NOTES',
+           'ENTRY PRICE', 'STOP PRICE', 'TARGET PRICE', 'LOTS']
 HELP_TEXT = ('One row per idea. Times are Trinidad time (TT): type date AND time, e.g. 2026-10-06 12:00. '
              'Baseline = first verified quote AFTER you sign off; never back-fill it. '
              'Leave CLOSE blank while the idea is open.')
@@ -91,7 +97,7 @@ def parse_book_rows(rows):
     """
     ideas, problems = [], []
     for n, row in enumerate(rows, start=2):
-        cells = [_cell(row, i) for i in range(8)]
+        cells = [_cell(row, i) for i in range(12)]
         if all(c == '' for c in cells):
             continue
         where = 'IDEA BOOK row %d' % n
@@ -112,6 +118,10 @@ def parse_book_rows(rows):
                 if cells[5] == '' or cells[6] == '':
                     raise ValueError('CLOSE PRICE and CLOSE TIME must be filled together')
                 idea.close(_price(cells[5], 'CLOSE PRICE'), _time(cells[6], 'CLOSE TIME'))
+            for idx, attr, label in ((8, 'entry_price', 'ENTRY PRICE'), (9, 'stop_price', 'STOP PRICE'),
+                                     (10, 'target_price', 'TARGET PRICE'), (11, 'lots', 'LOTS')):
+                if cells[idx] != '':
+                    setattr(idea, attr, _price(cells[idx], label))
             ideas.append(idea)
         except ValueError as e:
             problems.append(where + ': ' + str(e))
@@ -144,7 +154,7 @@ def init_idea_book(svc):
         spreadsheetId=SPREADSHEET_ID, range="'" + BOOK_TAB + "'!A1", valueInputOption='RAW',
         body={'values': [HEADERS]}).execute()
     svc.spreadsheets().values().update(
-        spreadsheetId=SPREADSHEET_ID, range="'" + BOOK_TAB + "'!J1", valueInputOption='RAW',
+        spreadsheetId=SPREADSHEET_ID, range="'" + BOOK_TAB + "'!N1", valueInputOption='RAW',
         body={'values': [[HELP_TEXT]]}).execute()
     svc.spreadsheets().batchUpdate(spreadsheetId=SPREADSHEET_ID, body={'requests': [
         {'setDataValidation': {
@@ -163,7 +173,7 @@ def read_book(svc):
     """Returns (ideas, problems). Read only."""
     try:
         resp = svc.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID, range="'" + BOOK_TAB + "'!A2:H500",
+            spreadsheetId=SPREADSHEET_ID, range="'" + BOOK_TAB + "'!A2:L500",
             valueRenderOption='UNFORMATTED_VALUE', dateTimeRenderOption='SERIAL_NUMBER').execute()
     except Exception as e:
         return [], ['Could not read the IDEA BOOK tab (' + type(e).__name__ + '). '
