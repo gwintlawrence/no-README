@@ -1,0 +1,96 @@
+# ════════════════════════════════════════════════════════════════
+# F4P COT RE-CHECK — SATURDAY SAFETY NET
+# GWL Trading Team · Fishin4Pips System
+#
+# FILE LOCATION IN REPO: .github/workflows/f4p_cot_recheck.yml
+#
+# WHY: the Friday COT fetch once ran before the CFTC file was updated, and the
+# Hub kept showing the previous week's positioning. This re-checks on Saturday.
+#
+# WHAT THIS DOES:
+#   1. Reads the COT as-of dates on FRED AUTO (read only).
+#   2. If they are the ones the latest Friday release should carry: done.
+#   3. If not: re-runs the COT fetch once, then checks again.
+#   4. If it is STILL not current, the run FAILS (GitHub emails you) with the
+#      reason. It never invents data. In a week where Friday was a US holiday
+#      the CFTC publishes on Monday, and the message says so.
+#   5. Refreshes the HUB STATUS tab so the badge matches the data.
+#
+# SCHEDULE: Saturday 15:30 UTC. Other Saturday job: equities at 10:00 UTC, so
+# they cannot collide. Manual run: Actions tab > Run workflow (tick Dry run to
+# only look, with no re-fetch and no writes).
+#
+# SECRETS NEEDED: FRED_API_KEY, GOOGLE_CREDENTIALS (already set)
+# ════════════════════════════════════════════════════════════════
+
+name: F4P COT Re-check
+
+on:
+  schedule:
+    - cron: '30 15 * * 6'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: only check and print. No re-fetch, no writes."
+        type: boolean
+        default: false
+
+jobs:
+  cot-recheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install requests google-auth google-auth-oauthlib google-api-python-client
+
+      - name: Check COT as-of dates
+        id: check
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: |
+          code=0
+          python f4p_cot_recheck.py || code=$?
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+      - name: Fail loudly if the check itself broke
+        if: steps.check.outputs.code != '0' && steps.check.outputs.code != '3'
+        run: |
+          echo "The COT check could not run (exit code ${{ steps.check.outputs.code }}). See the step above."
+          exit 1
+
+      - name: Re-run the COT fetch (only if stale)
+        if: steps.check.outputs.code == '3' && inputs.dry_run != true
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: |
+          python fred_cot_fetcher.py --force-cot
+
+      - name: Check again (fails the run if still not current)
+        if: steps.check.outputs.code == '3' && inputs.dry_run != true
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: |
+          python f4p_cot_recheck.py --strict
+
+      - name: Refresh HUB STATUS
+        if: always() && inputs.dry_run != true
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+        run: |
+          python f4p_freshness_status.py
+
+      - name: Dry run note
+        if: inputs.dry_run == true
+        run: |
+          echo "Dry run: checked only. Nothing was re-fetched or written."
