@@ -51,10 +51,39 @@ class LatestDateTests(unittest.TestCase):
         self.assertEqual(fs.classify(fs.source_timestamp(EQ, [serial(2026, 9, 19)]), NOW, c, s), 'STALE')
 
 
+RS = [s for s in fs.SOURCES if s['name'] == 'Equities research (Claude)'][0]
+
+
+def row(ticker, ind, value, d):
+    return [ticker, ind, 'x', value, 'N/A', 'N/A', 'N/A', d]
+
+
+class ResearchRowsTests(unittest.TestCase):
+    def test_newest_real_run_decides(self):
+        rows = [row('AAPL', 6, 'raise', serial(2026, 9, 26)), row('MSFT', 7, 'launch', serial(2026, 10, 3))]
+        self.assertEqual(fs.source_timestamp(RS, rows).date().isoformat(), '2026-10-03')
+
+    def test_failed_claude_rows_do_not_count(self):
+        rows = [row('AAPL', 6, 'raise', serial(2026, 9, 26)), row('AAPL', 6, 'N/A', serial(2026, 10, 3)),
+                row('AAPL', 7, '', serial(2026, 10, 3))]
+        self.assertEqual(fs.source_timestamp(RS, rows).date().isoformat(), '2026-09-26')
+
+    def test_other_indicators_do_not_count(self):
+        self.assertIsNone(fs.source_timestamp(RS, [row('AAPL', 3, 'x', serial(2026, 10, 3))]))
+
+    def test_short_or_junk_rows_are_ignored(self):
+        self.assertIsNone(fs.source_timestamp(RS, [['AAPL', 6], [], ['AAPL', 'x', 'y', 'z', '', '', '', 'bad']]))
+
+    def test_float_indicator_from_sheet_reads(self):
+        self.assertIsNotNone(fs.source_timestamp(RS, [row('AAPL', 6.0, 'raise', serial(2026, 10, 3))]))
+
+
 class EvaluateTests(unittest.TestCase):
     def reader(self, calls):
-        def read(tab, a1, env=None):
+        def read(tab, a1, env=None, rows=False):
             calls.append((tab, env))
+            if env and rows:
+                return [['AAPL', 6, 'Forward Guidance', 'raise', 'N/A', 'N/A', 'N/A', serial(2026, 10, 3)]]
             if env:
                 return [serial(2026, 10, 3)]
             return ['Last run: 2026-10-10 10:00 UTC'] if tab == 'FRED AUTO' and a1 == 'A1' else ['261006'] * 8
@@ -64,10 +93,12 @@ class EvaluateTests(unittest.TestCase):
         calls = []
         r = fs.evaluate(fs.SOURCES, self.reader(calls), NOW)
         self.assertIn(('OPTIONS FLOW & IV', 'EQUITIES_SHEET_ID'), calls)
-        self.assertEqual({x['name']: x['status'] for x in r['sources']}['Equities weekly run'], 'CURRENT')
+        by = {x['name']: x['status'] for x in r['sources']}
+        self.assertEqual(by['Equities weekly run'], 'CURRENT')
+        self.assertEqual(by['Equities research (Claude)'], 'CURRENT')
 
     def test_missing_equities_sheet_is_unknown_not_current(self):
-        def read(tab, a1, env=None):
+        def read(tab, a1, env=None, rows=False):
             if env:
                 raise RuntimeError('EQUITIES_SHEET_ID is not set')
             return ['Last run: 2026-10-10 10:00 UTC'] if a1 == 'A1' else ['261006'] * 8

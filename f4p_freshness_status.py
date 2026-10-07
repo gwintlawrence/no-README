@@ -20,8 +20,10 @@ Equities: the weekly Alpha Vantage step appends a dated row per ticker to the
 OPTIONS FLOW & IV tab of the separate Equities spreadsheet (secret
 EQUITIES_SHEET_ID), so the NEWEST date in its column A is when that step last
 ran. If EQUITIES_SHEET_ID is not available the feed is UNKNOWN, never CURRENT.
-The Claude research step (qualitative) has no timestamp cell of its own and is
-not covered.
+The Claude research step is read from EQUITIES HUB DATA indicators 6 and 7: the
+run date sits in column H of each row. A failed Claude call still writes a dated
+row of "N/A", so only rows with a real value in column D count; a run that
+produced nothing usable does not make the feed look fresh.
 """
 
 import argparse
@@ -46,6 +48,11 @@ SOURCES = [
     {'name': 'Equities weekly run', 'tab': 'OPTIONS FLOW & IV', 'range': 'A2:A5000',
      'kind': 'latest_date', 'spreadsheet_env': 'EQUITIES_SHEET_ID',
      'current_hours': 9 * 24, 'stale_hours': 16 * 24},        # runs Saturdays
+    # kind 'guidance_rows': whole rows are read. Ticker A, indicator B (6 or 7),
+    # real value D (not N/A), run date H. The NEWEST usable run date decides.
+    {'name': 'Equities research (Claude)', 'tab': 'EQUITIES HUB DATA', 'range': 'A2:H5000',
+     'kind': 'guidance_rows', 'rows': True, 'spreadsheet_env': 'EQUITIES_SHEET_ID',
+     'current_hours': 9 * 24, 'stale_hours': 16 * 24},
 ]
 
 # The FX decision screens (Gate Check) only care about the FX feeds, which all
@@ -106,6 +113,21 @@ def overall(statuses):
 
 def source_timestamp(source, values):
     """values: list of cell strings from the source's range."""
+    if source['kind'] == 'guidance_rows':
+        stamps = []
+        for row in values:
+            if len(row) < 8:
+                continue
+            try:
+                indicator = int(float(row[1]))
+            except (TypeError, ValueError):
+                continue
+            if indicator not in (6, 7) or str(row[3]).strip().upper() in ('', 'N/A'):
+                continue
+            d = parse_date(row[7])
+            if d is not None:
+                stamps.append(d)
+        return max(stamps) if stamps else None
     cells = [c for c in values if c is not None and str(c).strip()]
     if source['kind'] == 'run_stamp':
         return parse_run_stamp(cells[0]) if cells else None
@@ -126,7 +148,9 @@ def evaluate(sources, read_range, now=None):
     rows = []
     for s in sources:
         try:
-            if s.get('spreadsheet_env'):
+            if s.get('spreadsheet_env') and s.get('rows'):
+                cells = read_range(s['tab'], s['range'], s['spreadsheet_env'], True)
+            elif s.get('spreadsheet_env'):
                 cells = read_range(s['tab'], s['range'], s['spreadsheet_env'])
             else:
                 cells = read_range(s['tab'], s['range'])
@@ -159,7 +183,7 @@ def main():
 
     svc = _service()
 
-    def read_range(tab, a1, spreadsheet_env=None):
+    def read_range(tab, a1, spreadsheet_env=None, as_rows=False):
         if spreadsheet_env:
             sheet_id = os.environ.get(spreadsheet_env, '').strip()
             if not sheet_id:
@@ -170,6 +194,8 @@ def main():
         else:
             resp = svc.spreadsheets().values().get(
                 spreadsheetId=SPREADSHEET_ID, range="'" + tab + "'!" + a1).execute()
+        if as_rows:
+            return resp.get('values', [])
         return [c for row in resp.get('values', []) for c in row]
 
     result = evaluate(SOURCES, read_range)
