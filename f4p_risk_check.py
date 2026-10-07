@@ -27,6 +27,7 @@ LOT_UNITS = 100000
 DEFAULT_RISK = {
     'account_size_usd': 500.0,
     'max_risk_pct_per_trade': 2.0,
+    'portfolio_budget_pct': 10.0,      # only this share of capital is ever put at risk in total
 }
 
 
@@ -93,6 +94,27 @@ def trade_risk(trade, limits=None):
         out['rr'] = round(target_distance_pips(trade['pair'], trade['direction'],
                                                trade['entry'], trade['target']) / pips, 2)
     return out
+
+
+def suggest_lots(pair, direction, entry, stop, other_risk_usd=0.0, limits=None):
+    """
+    Largest lot size (rounded DOWN to 0.01) that keeps this idea inside BOTH
+    your rules: max risk per trade, and the portfolio budget left after the
+    risk already on the book. Returns a dict; raises ValueError if it cannot
+    be worked out. A suggestion for the analyst, never an order.
+    """
+    lim = dict(DEFAULT_RISK)
+    lim.update(limits or {})
+    pips = stop_distance_pips(pair, direction, entry, stop)
+    per_pip = pip_value_usd_per_lot(pair, entry)
+    acct = lim['account_size_usd']
+    per_trade = acct * lim['max_risk_pct_per_trade'] / 100.0
+    budget_left = max(0.0, acct * lim['portfolio_budget_pct'] / 100.0 - float(other_risk_usd))
+    allowed = min(per_trade, budget_left)
+    lots = int(allowed / (pips * per_pip) * 100 + 1e-9) / 100.0
+    return {'lots': lots, 'stop_pips': pips, 'risk_usd': round(lots * pips * per_pip, 2),
+            'per_trade_cap_usd': round(per_trade, 2), 'budget_left_usd': round(budget_left, 2),
+            'limited_by': 'portfolio budget' if budget_left < per_trade else 'per-trade rule'}
 
 
 def check_risk(trades, limits=None):

@@ -7,6 +7,9 @@
 # WHAT THIS DOES:
 #   - setup_idea_book: creates the empty IDEA BOOK tab (once; never touches
 #     an existing tab)
+#   - setup_news_calendar: creates the empty NEWS CALENDAR tab (once; never
+#     touches an existing tab). You type the releases in; the Gate Check flags
+#     any near a new idea and suggests a lot size inside your 2% / 10% rules.
 #   - gate_check: reads your IDEA BOOK + live feed freshness, checks the new
 #     idea, writes the result to a GATE CHECK tab in the Master Macro Scorecard
 #
@@ -28,6 +31,7 @@ on:
         options:
           - gate_check
           - setup_idea_book
+          - setup_news_calendar
         default: gate_check
       pair:
         description: "Pair under consideration, e.g. USD/JPY (gate_check only)"
@@ -93,6 +97,8 @@ jobs:
         run: |
           if [ "$ACTION" = "setup_idea_book" ]; then
             python f4p_gate_check.py --init-idea-book
+          elif [ "$ACTION" = "setup_news_calendar" ]; then
+            python f4p_news_flag.py --init
           else
             if [ -z "$PAIR" ]; then echo "Please type a pair, e.g. USD/JPY"; exit 1; fi
             EXTRA=""

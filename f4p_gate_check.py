@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 import f4p_exposure_check as ex
 import f4p_idea_lifecycle as lc
+import f4p_news_flag as nf
 import f4p_risk_check as rk
 
 
@@ -34,7 +35,7 @@ def _warning_keys(result):
 
 def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
                       prices=None, close_rules=(), now=None, book_problems=(),
-                      candidate_trade=None, risk_limits=None):
+                      candidate_trade=None, risk_limits=None, news=None):
     """
     candidate:   (pair, direction) being considered.
     open_ideas:  lifecycle.Idea objects already on the book (any state).
@@ -42,6 +43,7 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
     book_problems: rows of the IDEA BOOK that could not be read. Any problem is
                  shown as a flag, because an unreadable row means the exposure
                  picture may be incomplete.
+    news:        result of f4p_news_flag.check_news(), or None (then the news check is left out).
     candidate_trade: {'entry','stop','lots','target'(optional)} for the new idea.
                  Without entry, stop and lots its risk is NOT CHECKED, never assumed safe.
     prices:      {pair: current price} used only to show pips and close flags.
@@ -93,6 +95,26 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
     risk_note = ' | '.join(risk['flags'] + risk['not_checked']) or (
         'All ideas within your %.1f%% rule.' % risk['limits']['max_risk_pct_per_trade'])
 
+    # Size suggestion: biggest lot size that keeps this idea inside the per-trade
+    # rule AND the portfolio budget left after the risk already on the book.
+    suggestion, sug_note = None, None
+    if ct.get('entry') not in (None, '') and ct.get('stop') not in (None, ''):
+        others = sum(r['risk_usd'] for r in risk['rows'] if r['label'] != trades[-1]['label'])
+        try:
+            suggestion = rk.suggest_lots(pair, direction, ct['entry'], ct['stop'], others, risk_limits)
+            sug_note = ('Up to %.2f lots keeps this idea at about $%.2f risk (stop %.1f pips). '
+                        'Limited by your %s; $%.2f of the portfolio budget is free.' % (
+                            suggestion['lots'], suggestion['risk_usd'], suggestion['stop_pips'],
+                            suggestion['limited_by'], suggestion['budget_left_usd']))
+            if suggestion['lots'] <= 0:
+                sug_note = 'No size fits: the budget left or the stop distance leaves less than 0.01 lots.'
+            elif ct.get('lots') not in (None, '') and float(ct['lots']) > suggestion['lots'] + 1e-9:
+                sug_note += ' Your %.2f lots is above that.' % float(ct['lots'])
+        except ValueError as e:
+            sug_note = 'Size not suggested: %s.' % e
+    else:
+        sug_note = 'Give --entry and --stop to get a suggested size.'
+
     checks = [
         {'item': 'Data freshness', 'status': fresh_overall,
          'ok': fresh_overall == 'CURRENT',
@@ -106,6 +128,10 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
          'ok': True,
          'note': 'Baseline is the first verified quote after sign-off. It is never back-filled.'},
     ]
+    checks.append({'item': 'Suggested size', 'status': 'INFO', 'ok': True, 'note': sug_note})
+    if news is not None:
+        checks.append({'item': 'News window', 'status': news['status'], 'ok': news['status'] == 'CLEAR',
+                       'note': nf.describe(news)})
     if book_problems:
         checks.insert(1, {'item': 'Idea book', 'status': 'PROBLEM', 'ok': False,
                           'note': 'Exposure may be incomplete. ' + ' | '.join(book_problems)})
@@ -118,6 +144,8 @@ def build_gate_packet(candidate, open_ideas=(), freshness=None, limits=None,
                    else 'NO FLAGS - ANALYST STILL SIGNS OFF',
         'exposure_after': after,
         'risk': risk,
+        'lot_suggestion': suggestion,
+        'news': news,
         'new_exposure_flags': new_flags,
         'freshness': freshness,
         'open_book': book,
@@ -214,8 +242,10 @@ def main():
         import f4p_idea_book as ib
         svc = ib._service()
         ideas, problems = ib.read_book(svc)
+        events, news_problems = nf.read_events(svc, ib.SPREADSHEET_ID)
+        news = nf.check_news(a.pair, events=events, problems=news_problems)
         packet = build_gate_packet((a.pair, a.direction), ideas, _live_freshness(svc),
-                                   book_problems=problems, candidate_trade=cand)
+                                   book_problems=problems, candidate_trade=cand, news=news)
         text = format_packet(packet) + '\n\nIdeas read from IDEA BOOK: %d' % len(ideas)
         print(text)
         if not a.dry_run:
