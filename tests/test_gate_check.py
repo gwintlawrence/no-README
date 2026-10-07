@@ -26,8 +26,14 @@ class GateTests(unittest.TestCase):
         self.assertTrue(p['new_exposure_flags'])
 
     def test_clear_when_nothing_flagged(self):
-        p = gc.build_gate_packet(('EUR/USD', 'LONG'), [], FRESH)
+        trade = {'entry': 1.12, 'stop': 1.115, 'lots': 0.02}     # 50 pips x $0.20 = $10 = 2.0%
+        p = gc.build_gate_packet(('EUR/USD', 'LONG'), [], FRESH, candidate_trade=trade)
         self.assertIn('NO FLAGS', p['summary'])
+
+    def test_risk_not_provided_is_not_checked_never_safe(self):
+        p = gc.build_gate_packet(('EUR/USD', 'LONG'), [], FRESH)
+        risk = [c for c in p['checks'] if c['item'] == 'Risk per trade'][0]
+        self.assertEqual((risk['status'], risk['ok']), ('NOT CHECKED', False))
 
     def test_missing_freshness_is_unknown_not_green(self):
         p = gc.build_gate_packet(('EUR/USD', 'LONG'), [], None)
