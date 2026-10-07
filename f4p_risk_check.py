@@ -18,6 +18,8 @@ Honest limits:
     broker's own contract size and spread can differ slightly.
 """
 
+import math
+
 import f4p_exposure_check as ex
 import f4p_idea_lifecycle as lc
 
@@ -62,6 +64,23 @@ def target_distance_pips(pair, direction, entry, target):
     return round((float(target) - float(entry)) / lc.pip_size(pair) * sign, 1)
 
 
+LOT_STEP = 0.01
+
+
+def max_lots(pair, entry, stop, direction, limits=None):
+    """
+    Largest lot size (in 0.01 steps, rounded DOWN) whose stop loss stays within
+    the rule. 0.0 means even 0.01 lot would be over the rule at this stop.
+    """
+    import math
+    lim = dict(DEFAULT_RISK)
+    lim.update(limits or {})
+    pips = stop_distance_pips(pair, direction, entry, stop)
+    budget = lim['account_size_usd'] * lim['max_risk_pct_per_trade'] / 100.0
+    raw = budget / (pips * pip_value_usd_per_lot(pair, entry))
+    return round(math.floor(raw / LOT_STEP + 1e-9) * LOT_STEP, 2)
+
+
 def trade_risk(trade, limits=None):
     """
     trade: {'label','pair','direction','entry','stop','lots', 'target' (optional)}
@@ -70,6 +89,15 @@ def trade_risk(trade, limits=None):
     """
     lim = dict(DEFAULT_RISK)
     lim.update(limits or {})
+    if trade.get('lots') in (None, '') and trade.get('entry') not in (None, '') \
+            and trade.get('stop') not in (None, ''):
+        # Size not chosen yet: say what the rule allows instead of just refusing.
+        m = max_lots(trade['pair'], trade['entry'], trade['stop'], trade['direction'], lim)
+        budget = lim['account_size_usd'] * lim['max_risk_pct_per_trade'] / 100.0
+        pips = stop_distance_pips(trade['pair'], trade['direction'], trade['entry'], trade['stop'])
+        raise ValueError('lot size is missing. At your %.1f%% rule ($%.2f), a %.1f-pip stop allows %s' % (
+            lim['max_risk_pct_per_trade'], budget, pips,
+            ('up to %.2f lots' % m) if m > 0 else 'less than the 0.01 minimum, so even 0.01 lot is over the rule'))
     for k in ('entry', 'stop', 'lots'):
         if trade.get(k) in (None, ''):
             raise ValueError('%s is missing' % {'entry': 'entry price', 'stop': 'stop price', 'lots': 'lot size'}[k])
@@ -112,10 +140,10 @@ def check_risk(trades, limits=None):
         rows.append(r)
         if r['risk_pct'] > lim['max_risk_pct_per_trade']:
             flags.append('%s risks $%.2f (%.1f%% of the account), above your %.1f%% rule ($%.2f). '
-                         'About %.2f lots would match the rule.' % (
+                         'The rule allows up to about %.2f lots at this stop.' % (
                              r['label'], r['risk_usd'], r['risk_pct'], lim['max_risk_pct_per_trade'],
                              lim['account_size_usd'] * lim['max_risk_pct_per_trade'] / 100.0,
-                             r['lots'] * lim['max_risk_pct_per_trade'] / r['risk_pct']))
+                             math.floor(r['lots'] * lim['max_risk_pct_per_trade'] / r['risk_pct'] / LOT_STEP + 1e-9) * LOT_STEP))
     total = round(sum(r['risk_usd'] for r in rows), 2)
     return {'rows': rows, 'flags': flags, 'not_checked': not_checked,
             'total_risk_usd': total,

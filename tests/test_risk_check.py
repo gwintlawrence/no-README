@@ -69,6 +69,23 @@ class RiskTests(unittest.TestCase):
         gbp = [r for r in p['risk']['rows'] if r['label'].startswith('GBP/USD')][0]
         self.assertEqual(gbp['risk_usd'], 0.0)
 
+    def test_how_many_lots_the_rule_allows(self):
+        m = lambda pair, d, e, st: rk.max_lots(pair, e, st, d)
+        self.assertEqual(m('EUR/USD', 'SHORT', 1.1250, 1.1300), 0.02)    # 50 pips -> $10
+        self.assertEqual(m('EUR/USD', 'SHORT', 1.1250, 1.1280), 0.03)    # 30 pips -> $9 (0.033 rounded down)
+        self.assertEqual(m('EUR/USD', 'SHORT', 1.1250, 1.1350), 0.01)    # 100 pips -> $10 at 0.01
+        self.assertEqual(m('EUR/USD', 'SHORT', 1.1250, 1.1400), 0.0)     # 150 pips: 0.01 lot is already over
+        self.assertEqual(m('GBP/USD', 'SHORT', 1.3260, 1.3310), 0.02)
+
+    def test_missing_lots_tells_you_what_the_rule_allows(self):
+        r = rk.check_risk([t('new', 'GBP/USD', 'SHORT', 1.3260, 1.3310, None)])
+        self.assertEqual(r['rows'], [])
+        self.assertIn('allows up to 0.02 lots', r['not_checked'][0])
+
+    def test_flag_suggests_a_size(self):
+        r = rk.check_risk([t('EUR/USD SHORT', 'EUR/USD', 'SHORT', 1.1250, 1.1300, 0.1)])
+        self.assertIn('up to about 0.02 lots', r['flags'][0])
+
     def test_total_if_everything_triggers(self):
         r = rk.check_risk([t('a', 'EUR/USD', 'SHORT', 1.125, 1.130, 0.1),
                            t('b', 'GBP/USD', 'SHORT', 1.326, 1.331, 0.1)])
