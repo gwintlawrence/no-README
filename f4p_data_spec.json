@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-15d",
+  "version": "2026-10-15e",
   "about": "Single source of truth for what the F4P Hub collects and how it is scored. The weekly pipeline (f4p_weekly_update.py), the Data Hunt manual prompts and the Data Hunt Compare view all read this file. Change a definition here, run build_prompt_pack.py, and all three agree.",
   "weights_pct": {
     "endogenous": 40,
@@ -202,8 +202,8 @@
             "measure": "10-Year Treasury Yield",
             "category": "Rates / Expectations",
             "source_url": "https://fred.stlouisfed.org/series/DGS10",
-            "where_to_find": "FRED → DGS10 → Large number on the chart is the current yield %. Note if rising, flat, or falling vs last week.",
-            "scoring_guide": "+2 rising = higher USD return attracting capital · +1 mild rise · 0 flat · -1 mild fall · -2 falling sharply."
+            "where_to_find": "FRED → DGS10 (daily) → read the latest daily value and the value from about a week earlier; both are on the chart.",
+            "scoring_guide": "Rising = higher USD return attracting capital. Score the change in the yield over the last 7 days (latest daily value against the value a week earlier): +2 up more than 0.25 point · +1 up 0.05 to 0.25 · 0 within 0.05 either way · -1 down 0.05 to 0.25 · -2 down more than 0.25 point."
           },
           {
             "num": 15,
@@ -358,9 +358,9 @@
             "hub_name": "10-Year Government Bond Yield",
             "measure": "10-Year Bund Yield (DE)",
             "category": "Rates / Expectations",
-            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01DEM156N",
-            "where_to_find": "FRED → German 10Y yield series → Note current level and direction vs last week. Germany = EZ benchmark.",
-            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 flat · -1 falling · -2 sharply falling (risk-off/recession fear)."
+            "source_url": "https://www.bundesbank.de/en/statistics/money-and-capital-markets/interest-rates-and-yields/daily-yields-of-current-federal-securities-772220",
+            "where_to_find": "Bundesbank → Daily yields of current Federal securities → the 10-year Bund (series BBSSY.D.REN.EUR.A630.000000WT1010.A, daily yield of the current 10-year federal bond; PDF or CSV download) → read the latest daily value and the value from a week earlier.",
+            "scoring_guide": "Germany = EZ benchmark. A sharp fall can signal risk-off or recession fear. Score the change in the yield over the last 7 days (latest daily value against the value a week earlier): +2 up more than 0.25 point · +1 up 0.05 to 0.25 · 0 within 0.05 either way · -1 down 0.05 to 0.25 · -2 down more than 0.25 point."
           },
           {
             "num": 15,
@@ -515,9 +515,9 @@
             "hub_name": "10-Year Government Bond Yield",
             "measure": "10-Year Gilt Yield",
             "category": "Rates / Expectations",
-            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01GBM156N",
-            "where_to_find": "FRED → UK 10Y government bond yield → Note current level and weekly direction.",
-            "scoring_guide": "+2 rising = higher GBP return = capital attracted · +1 mild rise · 0 flat · -1 falling · -2 sharp fall."
+            "source_url": "https://www.bankofengland.co.uk/boeapps/database/",
+            "where_to_find": "Bank of England Database → series IUDMNPY (10-year nominal par yield on British government securities, daily) → read the latest daily value and the value from a week earlier.",
+            "scoring_guide": "Rising = higher GBP return = capital attracted. Score the change in the yield over the last 7 days (latest daily value against the value a week earlier): +2 up more than 0.25 point · +1 up 0.05 to 0.25 · 0 within 0.05 either way · -1 down 0.05 to 0.25 · -2 down more than 0.25 point."
           },
           {
             "num": 15,
@@ -673,8 +673,8 @@
             "measure": "10-Year JGB Yield",
             "category": "Rates / Expectations",
             "source_url": "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/index.htm",
-            "where_to_find": "Japan Ministry of Finance → JGB yields table → Find '10-year' row. Note current yield and direction.",
-            "scoring_guide": "+2 rising = BoJ normalization = JPY bullish · +1 mild rise · 0 flat · -1 falling → -2 BoJ capping yields (YCC) = JPY bearish."
+            "where_to_find": "Japan Ministry of Finance → JGB yields table (daily) → the '10-year' column → read the latest day and the same column a week earlier.",
+            "scoring_guide": "Rising = BoJ normalization = JPY bullish; falling = BoJ capping yields (YCC) = JPY bearish. Score the change in the yield over the last 7 days (latest daily value against the value a week earlier): +2 up more than 0.25 point · +1 up 0.05 to 0.25 · 0 within 0.05 either way · -1 down 0.05 to 0.25 · -2 down more than 0.25 point."
           },
           {
             "num": 15,
@@ -829,9 +829,9 @@
             "hub_name": "10-Year Government Bond Yield",
             "measure": "10-Year Swiss Govt Bond Yield",
             "category": "Rates / Expectations",
-            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01CHM156N",
-            "where_to_find": "FRED → Switzerland 10Y yield → Note current level and weekly direction.",
-            "scoring_guide": "Swiss yields can go negative. +2 rising = return improving · +1 mild rise · 0 flat · -1 falling · -2 negative or sharply falling."
+            "source_url": "https://www.snb.ch/en/the-snb/mandates-goals/statistics/statistics-pub/current_interest_exchange_rates",
+            "where_to_find": "SNB → Current interest rates and exchange rates → Interest rates → yield on Swiss Confederation bonds, spot rate for 10-year maturities (daily). For the value a week earlier use the SNB data portal (data.snb.ch) series for Confederation bond yields, 10 years, daily.",
+            "scoring_guide": "Swiss yields can be near zero or negative; only the change is scored. Score the change in the yield over the last 7 days (latest daily value against the value a week earlier): +2 up more than 0.25 point · +1 up 0.05 to 0.25 · 0 within 0.05 either way · -1 down 0.05 to 0.25 · -2 down more than 0.25 point."
           },
           {
             "num": 15,
@@ -986,9 +986,9 @@
             "hub_name": "10-Year Government Bond Yield",
             "measure": "10-Year Canada Govt Bond Yield",
             "category": "Rates / Expectations",
-            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01CAM156N",
-            "where_to_find": "FRED → Canada 10Y yield → Note current level and weekly direction vs US 10Y.",
-            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 flat · -1 falling · -2 sharply falling."
+            "source_url": "https://www.bankofcanada.ca/rates/interest-rates/canadian-bonds/",
+            "where_to_find": "Bank of Canada → Canadian bonds → Selected benchmark bond yields → the 10-year row → read the latest day and the value from a week earlier (the 10-year lookup page on the same site goes further back).",
+            "scoring_guide": "Compare the move with the US 10-year as context only. Score the change in the yield over the last 7 days (latest daily value against the value a week earlier): +2 up more than 0.25 point · +1 up 0.05 to 0.25 · 0 within 0.05 either way · -1 down 0.05 to 0.25 · -2 down more than 0.25 point."
           },
           {
             "num": 15,
@@ -1143,9 +1143,9 @@
             "hub_name": "10-Year Government Bond Yield",
             "measure": "10-Year ACGB Yield",
             "category": "Rates / Expectations",
-            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01AUM156N",
-            "where_to_find": "FRED → Australia 10Y government bond yield → Note current level and weekly direction.",
-            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 flat · -1 falling · -2 sharply falling."
+            "source_url": "https://www.rba.gov.au/statistics/tables/",
+            "where_to_find": "RBA → Statistical Tables → F2 Capital Market Yields – Government Bonds – Daily → the 10-year Australian Government bond column → read the latest daily value and the value from a week earlier.",
+            "scoring_guide": "Score the change in the yield over the last 7 days (latest daily value against the value a week earlier): +2 up more than 0.25 point · +1 up 0.05 to 0.25 · 0 within 0.05 either way · -1 down 0.05 to 0.25 · -2 down more than 0.25 point."
           },
           {
             "num": 15,
@@ -1300,9 +1300,9 @@
             "hub_name": "10-Year Government Bond Yield",
             "measure": "10-Year NZ Govt Bond Yield",
             "category": "Rates / Expectations",
-            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01NZM156N",
-            "where_to_find": "FRED → New Zealand 10Y yield → Note current level and direction vs last week.",
-            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 flat · -1 falling · -2 sharply falling."
+            "source_url": "https://www.rbnz.govt.nz/statistics/series/exchange-and-interest-rates/wholesale-interest-rates",
+            "where_to_find": "RBNZ → Statistics → Wholesale interest rates (B2, daily) → secondary market government bond closing yields, 10 years → read the latest day and the value from a week earlier.",
+            "scoring_guide": "Score the change in the yield over the last 7 days (latest daily value against the value a week earlier): +2 up more than 0.25 point · +1 up 0.05 to 0.25 · 0 within 0.05 either way · -1 down 0.05 to 0.25 · -2 down more than 0.25 point."
           },
           {
             "num": 15,
