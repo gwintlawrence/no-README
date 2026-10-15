@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-15b",
+  "version": "2026-10-15c",
   "about": "Single source of truth for what the F4P Hub collects and how it is scored. The weekly pipeline (f4p_weekly_update.py), the Data Hunt manual prompts and the Data Hunt Compare view all read this file. Change a definition here, run build_prompt_pack.py, and all three agree.",
   "weights_pct": {
     "endogenous": 40,
@@ -183,7 +183,7 @@
             "category": "Fiscal Health",
             "source_url": "https://fred.stlouisfed.org/series/GFDEGDQ188S",
             "where_to_find": "FRED → GFDEGDQ188S → Chart shows federal debt as % of GDP. Note current level and trend direction.",
-            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising steadily · -2 rapidly rising (markets demanding higher yield premium)."
+            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points (markets demanding a higher yield premium)."
           },
           {
             "num": 13,
@@ -213,7 +213,7 @@
             "category": "Central Bank",
             "source_url": "https://fred.stlouisfed.org/series/WALCL",
             "where_to_find": "FRED → WALCL → Shows Fed total assets (balance sheet). Compare to prior periods — is it expanding (QE) or shrinking (QT)?",
-            "scoring_guide": "+2 QT (shrinking) = hawkish · +1 holding steady · 0 flat · -1 slow expansion · -2 aggressive QE = currency dilution."
+            "scoring_guide": "+2 shrinking quickly (QT = hawkish) · +1 shrinking slowly · 0 flat or holding steady · -1 expanding slowly · -2 expanding fast (aggressive QE = currency dilution)."
           }
         ]
       },
@@ -340,7 +340,7 @@
             "category": "Fiscal Health",
             "source_url": "https://ec.europa.eu/eurostat/web/government-finance-statistics",
             "where_to_find": "Eurostat Government Finance → Govt debt as % of GDP. Check latest annual figure and trend.",
-            "scoring_guide": "High debt constrains ECB flexibility. +1 improving · 0 stable · -1 rising slowly · -2 rapidly worsening."
+            "scoring_guide": "High debt constrains ECB flexibility. Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
@@ -370,7 +370,7 @@
             "category": "Central Bank",
             "source_url": "https://www.ecb.europa.eu/pub/annual/balance/html/index.en.html",
             "where_to_find": "ECB annual balance sheet data. Check if assets are expanding (QE) or shrinking (QT) as trend.",
-            "scoring_guide": "+2 shrinking (QT/hawkish) · +1 stable · 0 flat · -1 slowly expanding · -2 aggressive QE = EUR dilution."
+            "scoring_guide": "+2 shrinking quickly (QT/hawkish) · +1 shrinking slowly · 0 flat or holding steady · -1 expanding slowly · -2 expanding fast (aggressive QE = EUR dilution)."
           }
         ]
       },
@@ -497,7 +497,7 @@
             "category": "Fiscal Health",
             "source_url": "https://www.ons.gov.uk/economy/governmentpublicsectorandtaxes/publicspending",
             "where_to_find": "ONS Public Sector Finances → Public sector net debt as % of GDP. Note current level and trend.",
-            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising · -2 rapid deterioration."
+            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
@@ -527,7 +527,7 @@
             "category": "Central Bank",
             "source_url": "https://www.bankofengland.co.uk/statistics/balance-sheet",
             "where_to_find": "BoE Balance Sheet statistics → Total assets value. Compare trend — expanding (QE) or shrinking (QT)?",
-            "scoring_guide": "+2 QT (shrinking) = hawkish · +1 stable · 0 flat · -1 slow expansion · -2 aggressive QE."
+            "scoring_guide": "+2 shrinking quickly (QT = hawkish) · +1 shrinking slowly · 0 flat or holding steady · -1 expanding slowly · -2 expanding fast (aggressive QE)."
           }
         ]
       },
@@ -654,7 +654,7 @@
             "category": "Fiscal Health",
             "source_url": "https://fred.stlouisfed.org/series/DEBTTLJPA188A",
             "where_to_find": "FRED → Japan debt/GDP → Annual figure. Japan debt is very high (~260% GDP) — watch trend direction.",
-            "scoring_guide": "0 stable · -1 rising slowly · -2 rising sharply. Note: High absolute level is structural — changes in direction matter most."
+            "scoring_guide": "The very high level is structural, so only the change is scored. Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
@@ -684,7 +684,7 @@
             "category": "Central Bank",
             "source_url": "https://fred.stlouisfed.org/series/JPNASSETS",
             "where_to_find": "FRED → Japan central bank assets → Is BoJ balance sheet expanding (QE/YCC) or shrinking (normalization)?",
-            "scoring_guide": "+2 shrinking (normalization/hawkish) · +1 stable · 0 flat · -1 slowly growing · -2 aggressive expansion = JPY bearish."
+            "scoring_guide": "+2 shrinking quickly (normalization/hawkish) · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly · -2 expanding fast (aggressive expansion = JPY bearish)."
           }
         ]
       },
@@ -811,7 +811,7 @@
             "category": "Fiscal Health",
             "source_url": "https://fred.stlouisfed.org/series/DEBTTLCHA188A",
             "where_to_find": "FRED → Switzerland debt/GDP → Annual figure. Switzerland typically has very low debt — watch trend.",
-            "scoring_guide": "+2 declining (already very low) · +1 stable · 0 slowly rising · -1 rising · -2 rising sharply."
+            "scoring_guide": "Debt is very low, so only the change is scored. Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
@@ -841,7 +841,7 @@
             "category": "Central Bank",
             "source_url": "https://www.snb.ch/en/the-snb/mandates-goals/statistics/statistics-pub/balance_sheet",
             "where_to_find": "SNB Balance Sheet → Total assets. SNB has one of the largest balance sheets relative to GDP globally.",
-            "scoring_guide": "+2 shrinking · +1 stable · 0 flat · -1 growing (FX intervention) · -2 large expansion = CHF dilution."
+            "scoring_guide": "+2 shrinking quickly · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly (FX intervention) · -2 expanding fast (large expansion = CHF dilution)."
           }
         ]
       },
@@ -968,7 +968,7 @@
             "category": "Fiscal Health",
             "source_url": "https://fred.stlouisfed.org/series/DEBTTLCAA188A",
             "where_to_find": "FRED → Canada debt/GDP series → Annual figure and trend direction.",
-            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising · -2 rapidly rising."
+            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
@@ -998,7 +998,7 @@
             "category": "Central Bank",
             "source_url": "https://www.bankofcanada.ca/rates/banking-and-financial-statistics/bank-of-canada-assets-and-liabilities-weekly-wednesday/",
             "where_to_find": "BoC weekly balance sheet → Total assets. Note if shrinking (QT) or growing (QE).",
-            "scoring_guide": "+2 shrinking (QT) · +1 stable · 0 flat · -1 slowly growing · -2 aggressive expansion."
+            "scoring_guide": "+2 shrinking quickly (QT) · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly · -2 expanding fast (aggressive expansion)."
           }
         ]
       },
@@ -1125,7 +1125,7 @@
             "category": "Fiscal Health",
             "source_url": "https://fred.stlouisfed.org/series/DEBTTLAUA188A",
             "where_to_find": "FRED → Australia debt/GDP → Annual figure and trend direction.",
-            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising · -2 rapidly rising."
+            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
@@ -1155,7 +1155,7 @@
             "category": "Central Bank",
             "source_url": "https://www.rba.gov.au/statistics/frequency/balance-sheet.html",
             "where_to_find": "RBA Balance Sheet → Total assets. Note if shrinking (post-QE normalisation) or stable.",
-            "scoring_guide": "+2 shrinking (normalising) · +1 stable · 0 flat · -1 slowly growing · -2 aggressive expansion."
+            "scoring_guide": "+2 shrinking quickly (normalising) · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly · -2 expanding fast (aggressive expansion)."
           }
         ]
       },
@@ -1282,7 +1282,7 @@
             "category": "Fiscal Health",
             "source_url": "https://www.treasury.govt.nz/information-and-services/financial-management-and-advice/financial-statements-government",
             "where_to_find": "NZ Treasury → Financial Statements → Net core Crown debt as % of GDP.",
-            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising · -2 rapidly rising."
+            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
@@ -1312,7 +1312,7 @@
             "category": "Central Bank",
             "source_url": "https://www.rbnz.govt.nz/statistics/series/reserve-bank-balance-sheet",
             "where_to_find": "RBNZ Balance Sheet → Total assets. Note trend — shrinking post-QE or stable.",
-            "scoring_guide": "+2 shrinking (normalising) · +1 stable · 0 flat · -1 growing · -2 aggressive expansion."
+            "scoring_guide": "+2 shrinking quickly (normalising) · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly · -2 expanding fast (aggressive expansion)."
           }
         ]
       }
