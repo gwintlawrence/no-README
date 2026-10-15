@@ -20,8 +20,8 @@ FRED_SERIES = [
     ('FEDFUNDS',        'latest', 'Federal Funds Rate %',        4),
     ('CPIAUCSL',        'yoy',    'CPI YoY %',                   5),
     ('CPILFESL',        'yoy',    'Core CPI YoY %',              6),
-    ('PPIACO',          'yoy',    'PPI Headline YoY %',          7),
-    ('PPIFES',          'yoy',    'Core PPI YoY %',              8),
+    ('PPIFIS',          'yoy',    'PPI Headline YoY %',          7),
+    ('WPSFD49116',      'yoy',    'Core PPI YoY %',              8),
     ('PAYEMS',          'mom',    'NFP MoM Change (000s)',        9),
     ('UNRATE',          'latest', 'Unemployment Rate %',         10),
     ('PERMIT',          'latest', 'Building Permits (000s)',      11),
@@ -36,8 +36,8 @@ FRED_SOURCE_AGENCY = {
     'FEDFUNDS':        'Board of Governors of the Federal Reserve System',
     'CPIAUCSL':        'U.S. Bureau of Labor Statistics',
     'CPILFESL':        'U.S. Bureau of Labor Statistics',
-    'PPIACO':          'U.S. Bureau of Labor Statistics',
-    'PPIFES':          'U.S. Bureau of Labor Statistics',
+    'PPIFIS':          'U.S. Bureau of Labor Statistics',
+    'WPSFD49116':      'U.S. Bureau of Labor Statistics',
     'PAYEMS':          'U.S. Bureau of Labor Statistics',
     'UNRATE':          'U.S. Bureau of Labor Statistics',
     'PERMIT':          'U.S. Census Bureau',
@@ -58,35 +58,55 @@ COT_CODES = {
 COT_START_ROW = 17
 
 
-def get_fred_value(series_id, calculation):
-    url = (
-        'https://api.stlouisfed.org/fred/series/observations'
-        '?series_id=' + series_id +
-        '&api_key=' + FRED_API_KEY +
-        '&sort_order=desc&limit=14&file_type=json'
-    )
-    resp = requests.get(url, timeout=30)
-    resp.raise_for_status()
-    observations = resp.json().get('observations', [])
-    valid = [o for o in observations if o['value'] != '.']
+def _months_before(date_str, months):
+    """'2026-09-01' shifted back by `months` calendar months -> '2025-09-01' (FRED monthly dates fall on the 1st)."""
+    y, m, d = (int(x) for x in date_str.split('-'))
+    total = y * 12 + (m - 1) - months
+    return '%04d-%02d-%02d' % (total // 12, total % 12 + 1, d)
+
+
+def calculate_from_observations(observations, calculation):
+    """
+    Pure calculation on a FRED observations list (newest first). Returns (value, latest_date).
+
+    Year-over-year and month-over-month changes are taken against the reading dated exactly 12 (or 1)
+    calendar months earlier, never against "the 13th (or 2nd) reading back". Those are different when a
+    month is missing: the BLS never published October 2025 CPI (government shutdown), so FRED has no
+    2025-10-01 value, and counting 12 readings back from September 2026 lands on August 2025, a
+    13-month change that overstated CPI by about 0.3 points. If the exact month is absent the result is
+    None (blank), not a guess.
+    """
+    valid = [o for o in observations if o.get('value') not in (None, '.')]
     if not valid:
         return None, None
     latest_val = float(valid[0]['value'])
     latest_date = valid[0]['date']
     if calculation == 'latest':
         return round(latest_val, 2), latest_date
-    elif calculation == 'yoy':
-        if len(valid) < 13:
+    by_date = {o['date']: float(o['value']) for o in valid}
+    if calculation == 'yoy':
+        prior_val = by_date.get(_months_before(latest_date, 12))
+        if prior_val is None or prior_val == 0:
             return None, latest_date
-        prior_val = float(valid[12]['value'])
-        yoy = ((latest_val - prior_val) / prior_val) * 100
-        return round(yoy, 2), latest_date
-    elif calculation == 'mom':
-        if len(valid) < 2:
+        return round(((latest_val - prior_val) / prior_val) * 100, 2), latest_date
+    if calculation == 'mom':
+        prior_val = by_date.get(_months_before(latest_date, 1))
+        if prior_val is None:
             return None, latest_date
-        prior_val = float(valid[1]['value'])
         return round(latest_val - prior_val, 1), latest_date
     return None, latest_date
+
+
+def get_fred_value(series_id, calculation):
+    url = (
+        'https://api.stlouisfed.org/fred/series/observations'
+        '?series_id=' + series_id +
+        '&api_key=' + FRED_API_KEY +
+        '&sort_order=desc&limit=24&file_type=json'
+    )
+    resp = requests.get(url, timeout=30)
+    resp.raise_for_status()
+    return calculate_from_observations(resp.json().get('observations', []), calculation)
 
 
 def get_fred_meta(series_id):
@@ -402,8 +422,5 @@ def main():
     print('Done. Check FRED AUTO tab in your Sheet.')
 
 
-main()
-
-    
-
-    
+if __name__ == '__main__':
+    main()

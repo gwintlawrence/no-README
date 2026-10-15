@@ -49,6 +49,11 @@ def indicator_definitions_block(spec, currencies):
         "given, the guide decides the score (use the general scale above only to interpret a guide "
         "that does not cover the reading). In your answer, the \"indicator\" field must still be the "
         "generic indicator name from the numbered list above.",
+        "SOURCE RULE - use the named source and series for every indicator. If that source has not yet "
+        "published the newest release, report the latest value it does show, give its date, and say so in "
+        "the analysis. Do not substitute a different series, a weekly or not-seasonally-adjusted version, "
+        "or an estimate from another site, because the same indicator must be measured the same way every "
+        "week and by every person who checks it.",
     ]
     for code in currencies:
         lines.append(f"{code} ({table[code].get('name', code)}):")
