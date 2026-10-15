@@ -54,6 +54,9 @@ def indicator_definitions_block(spec, currencies):
         "the analysis. Do not substitute a different series, a weekly or not-seasonally-adjusted version, "
         "or an estimate from another site, because the same indicator must be measured the same way every "
         "week and by every person who checks it.",
+        "FRESHNESS RULE - if the page you read shows a daily or weekly figure (a yield, a rate, a central-bank "
+        "balance sheet) that is more than 7 days old, look for the newer value of that same series on the "
+        "central bank's own site or the source's data page, and always give the date of the value you use.",
     ]
     for code in currencies:
         lines.append(f"{code} ({table[code].get('name', code)}):")
