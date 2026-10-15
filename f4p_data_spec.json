@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-15",
+  "version": "2026-10-15b",
   "about": "Single source of truth for what the F4P Hub collects and how it is scored. The weekly pipeline (f4p_weekly_update.py), the Data Hunt manual prompts and the Data Hunt Compare view all read this file. Change a definition here, run build_prompt_pack.py, and all three agree.",
   "weights_pct": {
     "endogenous": 40,
@@ -69,11 +69,7 @@
             "category": "Demand / Confidence",
             "source_url": "https://data.sca.isr.umich.edu/",
             "where_to_find": "University of Michigan site → Large bold number at the top is the Index of Consumer Sentiment.",
-            "scoring_guide": "+2 above 80 or strongly rising · +1 above 70 · 0 stable 60-70 · -1 below 60 · -2 below 55 & falling.",
-            "hub_series": {
-              "series": "UMCSENT",
-              "calc": "latest value"
-            }
+            "scoring_guide": "+2 above 80 or strongly rising · +1 above 70 · 0 stable 60-70 · -1 below 60 · -2 below 55 & falling."
           },
           {
             "num": 4,
@@ -96,7 +92,7 @@
             "measure": "M2 Money Supply",
             "category": "Monetary Conditions",
             "source_url": "https://fred.stlouisfed.org/series/M2SL",
-            "where_to_find": "FRED → M2SL series → Check if M2 is expanding or contracting year-over-year. Hover over chart for latest value.",
+            "where_to_find": "FRED → M2SL (monthly, seasonally adjusted) → use the latest monthly reading and its year-over-year % change (that month versus the same month a year earlier). Do not switch to the weekly M2 series; if M2SL has not published the newest month yet, report its latest month and say so.",
             "scoring_guide": "+2 M2 expanding >5% YoY · +1 expanding 2-5% · 0 flat · -1 contracting · -2 contracting sharply (deflationary)."
           },
           {
@@ -124,7 +120,7 @@
             "scoring_guide": "+2 above 3.5% & rising · +1 above 2.5% · 0 near 2% target · -1 below 1.5% · -2 below 1% or falling sharply.",
             "hub_series": {
               "series": "CPIAUCSL",
-              "calc": "year-over-year % change of the seasonally adjusted index"
+              "calc": "year-over-year % change of the seasonally adjusted index (compared with the reading for the same month one year earlier)"
             }
           },
           {
@@ -138,7 +134,7 @@
             "scoring_guide": "Fed's most watched number. +2 above 3% sticky · +1 above 2.5% · 0 near 2.5% · -1 easing toward 2% · -2 falling sharply.",
             "hub_series": {
               "series": "CPILFESL",
-              "calc": "year-over-year % change of the seasonally adjusted index"
+              "calc": "year-over-year % change of the seasonally adjusted index (compared with the reading for the same month one year earlier)"
             }
           },
           {
@@ -151,8 +147,8 @@
             "where_to_find": "BLS PPI page → Latest News Release → 'Final demand' 12-month % change in the first paragraph.",
             "scoring_guide": "Leads CPI by 1-3 months. +2 above 4% & rising · +1 above 2% · 0 near 2% · -1 falling · -2 below 0% deflation.",
             "hub_series": {
-              "series": "PPIACO",
-              "calc": "year-over-year % change"
+              "series": "PPIFIS",
+              "calc": "year-over-year % change of the seasonally adjusted Final Demand index (compared with the reading for the same month one year earlier)"
             }
           },
           {
@@ -165,8 +161,8 @@
             "where_to_find": "Same BLS PPI release → Look for 'Final demand less foods, energy, and trade' — this is Core PPI. Note % change.",
             "scoring_guide": "Most reliable pipeline signal. +2 above 3% · +1 above 2% · 0 near 2% · -1 falling · -2 below 1%.",
             "hub_series": {
-              "series": "PPIFES",
-              "calc": "year-over-year % change"
+              "series": "WPSFD49116",
+              "calc": "year-over-year % change of the seasonally adjusted Final Demand less foods, energy and trade services index (compared with the reading for the same month one year earlier)"
             }
           },
           {

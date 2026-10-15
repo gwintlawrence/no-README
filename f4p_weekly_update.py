@@ -133,7 +133,9 @@ MODEL = "claude-sonnet-5"
 # so it isn't fully covered by this map.
 FRED_AUTO_TAB_NAME = "FRED AUTO"
 FRED_AUTO_INDICATOR_MAP = {
-    "Consumer Sentiment": "Michigan Consumer Sentiment",
+    # Consumer Sentiment is deliberately NOT pre-filled from FRED: FRED's copy of the University of
+    # Michigan index runs a month or more behind the release (15 Oct 2026: FRED showed August while the
+    # October preliminary was out). The definition names the University of Michigan site, so the AI reads it there.
     "Building Permits / Housing": "Building Permits (000s)",
     "CPI YoY": "CPI YoY %",
     "Core CPI": "Core CPI YoY %",
