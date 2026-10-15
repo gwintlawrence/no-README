@@ -1,0 +1,1460 @@
+{
+  "version": "2026-10-15",
+  "about": "Single source of truth for what the F4P Hub collects and how it is scored. The weekly pipeline (f4p_weekly_update.py), the Data Hunt manual prompts and the Data Hunt Compare view all read this file. Change a definition here, run build_prompt_pack.py, and all three agree.",
+  "weights_pct": {
+    "endogenous": 40,
+    "central_bank": 25,
+    "exogenous": 15,
+    "cot": 10,
+    "volatility": 10
+  },
+  "score_scale": {
+    "2": "Strongly supportive for the currency",
+    "1": "Mildly supportive",
+    "0": "Neutral / no clear signal",
+    "-1": "Mildly negative",
+    "-2": "Strongly negative for the currency"
+  },
+  "endogenous": {
+    "indicator_count": 15,
+    "max_abs_total": 30,
+    "hub_indicator_names": [
+      "Manufacturing PMI",
+      "Services PMI",
+      "Consumer Sentiment",
+      "Building Permits / Housing",
+      "M2 Money Supply",
+      "Central Bank Rate & Current Policy Stance",
+      "CPI YoY",
+      "Core CPI",
+      "PPI",
+      "Core PPI",
+      "Employment",
+      "Government Debt / GDP",
+      "Fiscal Balance",
+      "10-Year Government Bond Yield",
+      "Central Bank Balance Sheet / GDP"
+    ],
+    "currencies": {
+      "USD": {
+        "name": "US Dollar",
+        "flag": "🇺🇸",
+        "central_bank": "Federal Reserve (Fed)",
+        "indicators": [
+          {
+            "num": 1,
+            "id": "mfgpmi",
+            "hub_name": "Manufacturing PMI",
+            "measure": "ISM Manufacturing PMI",
+            "category": "Growth / Production",
+            "source_url": "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/",
+            "where_to_find": "Click 'Manufacturing' under Reports → PMI number is in the FIRST sentence of the report. Above 50 = expansion.",
+            "scoring_guide": "+2 above 52 & rising · +1 above 50 · 0 near 50 · -1 below 50 · -2 below 48 & falling."
+          },
+          {
+            "num": 2,
+            "id": "svspmi",
+            "hub_name": "Services PMI",
+            "measure": "ISM Services NMI",
+            "category": "Growth / Demand",
+            "source_url": "https://www.ismworld.org/supply-management-news-and-reports/reports/ism-report-on-business/",
+            "where_to_find": "Same ISM site → Click 'Services' tab → NMI headline number in the first paragraph.",
+            "scoring_guide": "Services = 70% of US GDP. +2 above 56 · +1 above 52 · 0 near 50 · -1 below 50 · -2 below 47."
+          },
+          {
+            "num": 3,
+            "id": "sentiment",
+            "hub_name": "Consumer Sentiment",
+            "measure": "Consumer Sentiment (UoM)",
+            "category": "Demand / Confidence",
+            "source_url": "https://data.sca.isr.umich.edu/",
+            "where_to_find": "University of Michigan site → Large bold number at the top is the Index of Consumer Sentiment.",
+            "scoring_guide": "+2 above 80 or strongly rising · +1 above 70 · 0 stable 60-70 · -1 below 60 · -2 below 55 & falling.",
+            "hub_series": {
+              "series": "UMCSENT",
+              "calc": "latest value"
+            }
+          },
+          {
+            "num": 4,
+            "id": "permits",
+            "hub_name": "Building Permits / Housing",
+            "measure": "Building Permits",
+            "category": "Growth / Housing",
+            "source_url": "https://fred.stlouisfed.org/series/PERMIT",
+            "where_to_find": "FRED → PERMIT series → The most recent value is shown on the chart (in thousands of units, seasonally adjusted).",
+            "scoring_guide": "+2 if rising month-over-month significantly · +1 mild rise · 0 flat · -1 mild fall · -2 sharp decline.",
+            "hub_series": {
+              "series": "PERMIT",
+              "calc": "latest value (thousands, seasonally adjusted annual rate)"
+            }
+          },
+          {
+            "num": 5,
+            "id": "m2",
+            "hub_name": "M2 Money Supply",
+            "measure": "M2 Money Supply",
+            "category": "Monetary Conditions",
+            "source_url": "https://fred.stlouisfed.org/series/M2SL",
+            "where_to_find": "FRED → M2SL series → Check if M2 is expanding or contracting year-over-year. Hover over chart for latest value.",
+            "scoring_guide": "+2 M2 expanding >5% YoY · +1 expanding 2-5% · 0 flat · -1 contracting · -2 contracting sharply (deflationary)."
+          },
+          {
+            "num": 6,
+            "id": "cbrate",
+            "hub_name": "Central Bank Rate & Current Policy Stance",
+            "measure": "Fed Funds Rate / CB Stance",
+            "category": "Central Bank",
+            "source_url": "https://www.federalreserve.gov/releases/h15/",
+            "where_to_find": "Fed H.15 release → Find 'Federal funds (effective)' rate. Also check latest FOMC statement for direction (hiking/hold/cutting).",
+            "scoring_guide": "+2 hiking cycle or strong hawkish hold · +1 hold with hawkish lean · 0 neutral hold · -1 dovish lean · -2 cutting cycle.",
+            "hub_series": {
+              "series": "FEDFUNDS",
+              "calc": "latest value (rate number only; the stance still needs reading from the FOMC statement)"
+            }
+          },
+          {
+            "num": 7,
+            "id": "cpi",
+            "hub_name": "CPI YoY",
+            "measure": "CPI YoY (Headline)",
+            "category": "Inflation",
+            "source_url": "https://www.bls.gov/cpi/",
+            "where_to_find": "BLS CPI page → Click latest News Release → '12-month percent change, All items' is in the first table.",
+            "scoring_guide": "+2 above 3.5% & rising · +1 above 2.5% · 0 near 2% target · -1 below 1.5% · -2 below 1% or falling sharply.",
+            "hub_series": {
+              "series": "CPIAUCSL",
+              "calc": "year-over-year % change of the seasonally adjusted index"
+            }
+          },
+          {
+            "num": 8,
+            "id": "corecpi",
+            "hub_name": "Core CPI",
+            "measure": "Core CPI YoY",
+            "category": "Underlying Inflation",
+            "source_url": "https://www.bls.gov/cpi/",
+            "where_to_find": "Same BLS CPI release → Find 'All items less food and energy' row → annual % change column.",
+            "scoring_guide": "Fed's most watched number. +2 above 3% sticky · +1 above 2.5% · 0 near 2.5% · -1 easing toward 2% · -2 falling sharply.",
+            "hub_series": {
+              "series": "CPILFESL",
+              "calc": "year-over-year % change of the seasonally adjusted index"
+            }
+          },
+          {
+            "num": 9,
+            "id": "ppi",
+            "hub_name": "PPI",
+            "measure": "PPI YoY (Headline)",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.bls.gov/ppi/",
+            "where_to_find": "BLS PPI page → Latest News Release → 'Final demand' 12-month % change in the first paragraph.",
+            "scoring_guide": "Leads CPI by 1-3 months. +2 above 4% & rising · +1 above 2% · 0 near 2% · -1 falling · -2 below 0% deflation.",
+            "hub_series": {
+              "series": "PPIACO",
+              "calc": "year-over-year % change"
+            }
+          },
+          {
+            "num": 10,
+            "id": "coreppi",
+            "hub_name": "Core PPI",
+            "measure": "Core PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.bls.gov/ppi/",
+            "where_to_find": "Same BLS PPI release → Look for 'Final demand less foods, energy, and trade' — this is Core PPI. Note % change.",
+            "scoring_guide": "Most reliable pipeline signal. +2 above 3% · +1 above 2% · 0 near 2% · -1 falling · -2 below 1%.",
+            "hub_series": {
+              "series": "PPIFES",
+              "calc": "year-over-year % change"
+            }
+          },
+          {
+            "num": 11,
+            "id": "employ",
+            "hub_name": "Employment",
+            "measure": "NFP / Employment",
+            "category": "Labour Market",
+            "source_url": "https://www.bls.gov/ces/",
+            "where_to_find": "BLS Employment Situation → 'Total nonfarm' change in thousands is the bold number in the first paragraph. Compare to forecast.",
+            "scoring_guide": "+2 strong beat vs forecast · +1 mild beat · 0 in line · -1 mild miss · -2 large miss (recession signal)."
+          },
+          {
+            "num": 12,
+            "id": "debtgdp",
+            "hub_name": "Government Debt / GDP",
+            "measure": "Govt Debt / GDP",
+            "category": "Fiscal Health",
+            "source_url": "https://fred.stlouisfed.org/series/GFDEGDQ188S",
+            "where_to_find": "FRED → GFDEGDQ188S → Chart shows federal debt as % of GDP. Note current level and trend direction.",
+            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising steadily · -2 rapidly rising (markets demanding higher yield premium)."
+          },
+          {
+            "num": 13,
+            "id": "fiscal",
+            "hub_name": "Fiscal Balance",
+            "measure": "Fiscal Balance (Deficit/Surplus)",
+            "category": "Fiscal Health",
+            "source_url": "https://fred.stlouisfed.org/series/FYFSD",
+            "where_to_find": "FRED → FYFSD → Shows federal surplus/deficit. Negative = deficit. Note if it is widening or narrowing.",
+            "scoring_guide": "+1 surplus or narrowing deficit · 0 stable · -1 widening deficit · -2 sharply worsening fiscal position."
+          },
+          {
+            "num": 14,
+            "id": "yield10",
+            "hub_name": "10-Year Government Bond Yield",
+            "measure": "10-Year Treasury Yield",
+            "category": "Rates / Expectations",
+            "source_url": "https://fred.stlouisfed.org/series/DGS10",
+            "where_to_find": "FRED → DGS10 → Large number on the chart is the current yield %. Note if rising, flat, or falling vs last week.",
+            "scoring_guide": "+2 rising = higher USD return attracting capital · +1 mild rise · 0 flat · -1 mild fall · -2 falling sharply."
+          },
+          {
+            "num": 15,
+            "id": "cbbs",
+            "hub_name": "Central Bank Balance Sheet / GDP",
+            "measure": "CB Balance Sheet / GDP",
+            "category": "Central Bank",
+            "source_url": "https://fred.stlouisfed.org/series/WALCL",
+            "where_to_find": "FRED → WALCL → Shows Fed total assets (balance sheet). Compare to prior periods — is it expanding (QE) or shrinking (QT)?",
+            "scoring_guide": "+2 QT (shrinking) = hawkish · +1 holding steady · 0 flat · -1 slow expansion · -2 aggressive QE = currency dilution."
+          }
+        ]
+      },
+      "EUR": {
+        "name": "Euro",
+        "flag": "🇪🇺",
+        "central_bank": "European Central Bank (ECB)",
+        "indicators": [
+          {
+            "num": 1,
+            "id": "mfgpmi",
+            "hub_name": "Manufacturing PMI",
+            "measure": "EZ Manufacturing PMI",
+            "category": "Growth / Production",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "S&P Global PMI → Search 'Eurozone Manufacturing' → Latest press release → PMI number in the headline figure.",
+            "scoring_guide": "+2 above 52 & rising · +1 above 50 · 0 near 50 · -1 below 50 · -2 below 47 (deep contraction)."
+          },
+          {
+            "num": 2,
+            "id": "svspmi",
+            "hub_name": "Services PMI",
+            "measure": "EZ Services PMI",
+            "category": "Growth / Demand",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "Same site → Filter 'Eurozone Services' or Composite → PMI headline figure in the release.",
+            "scoring_guide": "EZ services has held up better than manufacturing. +2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+          },
+          {
+            "num": 3,
+            "id": "sentiment",
+            "hub_name": "Consumer Sentiment",
+            "measure": "Consumer Confidence (EZ)",
+            "category": "Demand / Confidence",
+            "source_url": "https://economy-finance.ec.europa.eu/economic-forecast-and-surveys/business-and-consumer-surveys_en",
+            "where_to_find": "EC Business & Consumer Surveys → Monthly Consumer Confidence Indicator. Negative number is normal — look at trend direction vs prior month.",
+            "scoring_guide": "+2 strongly rising month-over-month · +1 improving · 0 stable · -1 falling · -2 sharply negative & falling."
+          },
+          {
+            "num": 4,
+            "id": "permits",
+            "hub_name": "Building Permits / Housing",
+            "measure": "Building Permits (Germany)",
+            "category": "Growth / Housing",
+            "source_url": "https://www.destatis.de/EN/Themes/Economy/Construction/Tables/building-permits.html",
+            "where_to_find": "Destatis (German Statistics) → Building permits table → Find latest monthly figure and % change vs prior year.",
+            "scoring_guide": "German permits proxy for EZ construction health. +1 rising · 0 stable · -1 falling · -2 sharply declining."
+          },
+          {
+            "num": 5,
+            "id": "m2",
+            "hub_name": "M2 Money Supply",
+            "measure": "M2 / M3 Money Supply (EZ)",
+            "category": "Monetary Conditions",
+            "source_url": "https://www.ecb.europa.eu/stats/ecb_statistics/escb/html/table.en.html?id=JDF_BSI_M_U2_Y_V_M30_W_A_A_U2_EUR_A",
+            "where_to_find": "ECB Statistics → M3 annual growth rate. Check if money supply is expanding or contracting.",
+            "scoring_guide": "+2 M3 growing strongly (>5%) · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+          },
+          {
+            "num": 6,
+            "id": "cbrate",
+            "hub_name": "Central Bank Rate & Current Policy Stance",
+            "measure": "ECB Policy Rate / CB Stance",
+            "category": "Central Bank",
+            "source_url": "https://www.ecb.europa.eu/stats/policy_and_exchange_rates/key_ecb_interest_rates/html/index.en.html",
+            "where_to_find": "ECB Key Interest Rates page → Find Deposit Facility Rate. Check latest ECB meeting statement for direction.",
+            "scoring_guide": "+2 hiking or strong hawkish hold · +1 hold hawkish lean · 0 neutral hold · -1 dovish lean · -2 cutting cycle."
+          },
+          {
+            "num": 7,
+            "id": "cpi",
+            "hub_name": "CPI YoY",
+            "measure": "EZ CPI YoY (HICP)",
+            "category": "Inflation",
+            "source_url": "https://ec.europa.eu/eurostat/web/hicp",
+            "where_to_find": "Eurostat HICP → Click latest Flash Estimate or News Release → Annual inflation rate % for Eurozone.",
+            "scoring_guide": "+2 above 3% rising · +1 above 2.5% · 0 near 2% ECB target · -1 below 1.5% · -2 below 1% (deflation risk)."
+          },
+          {
+            "num": 8,
+            "id": "corecpi",
+            "hub_name": "Core CPI",
+            "measure": "EZ Core CPI YoY",
+            "category": "Underlying Inflation",
+            "source_url": "https://ec.europa.eu/eurostat/web/hicp",
+            "where_to_find": "Same Eurostat HICP release → Look for 'All-items HICP excluding energy and food' — this is Core HICP.",
+            "scoring_guide": "ECB's most watched inflation measure. Sticky core = hawkish ECB = EUR positive."
+          },
+          {
+            "num": 9,
+            "id": "ppi",
+            "hub_name": "PPI",
+            "measure": "EZ PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://ec.europa.eu/eurostat/web/short-term-business-statistics/data/database",
+            "where_to_find": "Eurostat Short-Term Statistics → Industry → Producer Prices. Find 'euro area' annual % change.",
+            "scoring_guide": "Leads HICP by 1-3 months. Rising PPI = future inflation = ECB stays hawkish = EUR positive."
+          },
+          {
+            "num": 10,
+            "id": "coreppi",
+            "hub_name": "Core PPI",
+            "measure": "EZ Core PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://ec.europa.eu/eurostat/web/short-term-business-statistics/data/database",
+            "where_to_find": "Same Eurostat page → Filter for ex-energy PPI (core). Note annual % change trend direction.",
+            "scoring_guide": "Core PPI strips out energy volatility — shows underlying cost pressure. Rising = inflationary."
+          },
+          {
+            "num": 11,
+            "id": "employ",
+            "hub_name": "Employment",
+            "measure": "Employment / Unemployment (EZ)",
+            "category": "Labour Market",
+            "source_url": "https://ec.europa.eu/eurostat/web/labour-market",
+            "where_to_find": "Eurostat Labour Market → Latest 'Euro area unemployment rate' monthly figure.",
+            "scoring_guide": "Lower unemployment = stronger economy. +2 falling sharply · +1 falling · 0 stable · -1 rising · -2 rising sharply."
+          },
+          {
+            "num": 12,
+            "id": "debtgdp",
+            "hub_name": "Government Debt / GDP",
+            "measure": "EZ Govt Debt / GDP",
+            "category": "Fiscal Health",
+            "source_url": "https://ec.europa.eu/eurostat/web/government-finance-statistics",
+            "where_to_find": "Eurostat Government Finance → Govt debt as % of GDP. Check latest annual figure and trend.",
+            "scoring_guide": "High debt constrains ECB flexibility. +1 improving · 0 stable · -1 rising slowly · -2 rapidly worsening."
+          },
+          {
+            "num": 13,
+            "id": "fiscal",
+            "hub_name": "Fiscal Balance",
+            "measure": "EZ Fiscal Balance",
+            "category": "Fiscal Health",
+            "source_url": "https://ec.europa.eu/eurostat/web/government-finance-statistics",
+            "where_to_find": "Same Eurostat page → General government deficit/surplus as % of GDP.",
+            "scoring_guide": "+1 surplus or improving · 0 stable · -1 widening deficit · -2 severe fiscal deterioration."
+          },
+          {
+            "num": 14,
+            "id": "yield10",
+            "hub_name": "10-Year Government Bond Yield",
+            "measure": "10-Year Bund Yield (DE)",
+            "category": "Rates / Expectations",
+            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01DEM156N",
+            "where_to_find": "FRED → German 10Y yield series → Note current level and direction vs last week. Germany = EZ benchmark.",
+            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 flat · -1 falling · -2 sharply falling (risk-off/recession fear)."
+          },
+          {
+            "num": 15,
+            "id": "cbbs",
+            "hub_name": "Central Bank Balance Sheet / GDP",
+            "measure": "ECB Balance Sheet / GDP",
+            "category": "Central Bank",
+            "source_url": "https://www.ecb.europa.eu/pub/annual/balance/html/index.en.html",
+            "where_to_find": "ECB annual balance sheet data. Check if assets are expanding (QE) or shrinking (QT) as trend.",
+            "scoring_guide": "+2 shrinking (QT/hawkish) · +1 stable · 0 flat · -1 slowly expanding · -2 aggressive QE = EUR dilution."
+          }
+        ]
+      },
+      "GBP": {
+        "name": "British Pound",
+        "flag": "🇬🇧",
+        "central_bank": "Bank of England (BoE)",
+        "indicators": [
+          {
+            "num": 1,
+            "id": "mfgpmi",
+            "hub_name": "Manufacturing PMI",
+            "measure": "UK Manufacturing PMI",
+            "category": "Growth / Production",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "S&P Global PMI → Filter 'United Kingdom Manufacturing' → PMI headline figure in latest release.",
+            "scoring_guide": "UK manufacturing is smaller than services but signals export health. Same +2/+1/0/-1/-2 vs 50 threshold."
+          },
+          {
+            "num": 2,
+            "id": "svspmi",
+            "hub_name": "Services PMI",
+            "measure": "UK Services PMI",
+            "category": "Growth / Demand",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "Same S&P Global site → Filter 'UK Services' → PMI headline figure.",
+            "scoring_guide": "MOST important PMI for GBP. UK is 80% services economy. +2 above 55 · +1 above 52 · 0 near 50 · -1 below 50 · -2 below 47."
+          },
+          {
+            "num": 3,
+            "id": "sentiment",
+            "hub_name": "Consumer Sentiment",
+            "measure": "Consumer Confidence (GfK)",
+            "category": "Demand / Confidence",
+            "source_url": "https://www.gfk.com/en-gb/press/uk-consumer-confidence",
+            "where_to_find": "GfK UK Consumer Confidence → Monthly headline figure. Negative is normal — look at trend vs prior month.",
+            "scoring_guide": "+2 strongly rising · +1 improving · 0 stable · -1 falling · -2 sharply negative & deteriorating."
+          },
+          {
+            "num": 4,
+            "id": "permits",
+            "hub_name": "Building Permits / Housing",
+            "measure": "UK Building Approvals",
+            "category": "Growth / Housing",
+            "source_url": "https://www.bankofengland.co.uk/statistics/mortgage-lender-and-administrator-statistics",
+            "where_to_find": "BoE Statistics → Mortgage approvals for house purchase. Monthly figure in thousands.",
+            "scoring_guide": "Rising approvals = housing market recovery = confidence. +1 rising · 0 stable · -1 falling · -2 sharply declining."
+          },
+          {
+            "num": 5,
+            "id": "m2",
+            "hub_name": "M2 Money Supply",
+            "measure": "M2 / M4 Money Supply (UK)",
+            "category": "Monetary Conditions",
+            "source_url": "https://www.bankofengland.co.uk/statistics/money-and-credit",
+            "where_to_find": "BoE Money & Credit page → M4 annual growth rate in the latest release.",
+            "scoring_guide": "M4 is BoE's preferred broad money measure. +2 growing >6% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+          },
+          {
+            "num": 6,
+            "id": "cbrate",
+            "hub_name": "Central Bank Rate & Current Policy Stance",
+            "measure": "Bank Rate / BoE Stance",
+            "category": "Central Bank",
+            "source_url": "https://www.bankofengland.co.uk/monetary-policy/the-interest-rate-bank-charges-banks",
+            "where_to_find": "BoE page → Current Bank Rate shown in large bold text. Check latest MPC vote split for direction.",
+            "scoring_guide": "+2 hiking or hawkish hold with vote to hike · +1 hold hawkish lean · 0 neutral · -1 dovish lean · -2 cutting cycle."
+          },
+          {
+            "num": 7,
+            "id": "cpi",
+            "hub_name": "CPI YoY",
+            "measure": "UK CPI YoY",
+            "category": "Inflation",
+            "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices",
+            "where_to_find": "ONS → Consumer price inflation → '12-month CPI rate' highlighted % box in the latest release.",
+            "scoring_guide": "BoE targets 2%. +2 above 3.5% · +1 above 2.5% · 0 near 2% · -1 below 1.5% · -2 below 1%."
+          },
+          {
+            "num": 8,
+            "id": "corecpi",
+            "hub_name": "Core CPI",
+            "measure": "UK Core CPI YoY",
+            "category": "Underlying Inflation",
+            "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices",
+            "where_to_find": "Same ONS CPI release → Find 'CPI excluding energy, food, alcohol & tobacco' — this is Core CPI.",
+            "scoring_guide": "BoE watches Services CPI closely. Sticky above 4% = hawkish BoE = GBP positive."
+          },
+          {
+            "num": 9,
+            "id": "ppi",
+            "hub_name": "PPI",
+            "measure": "UK PPI YoY (Output)",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices/bulletins/producerpriceinflation/latest",
+            "where_to_find": "ONS PPI bulletin → 'Output PPI' annual % change in the headline figure.",
+            "scoring_guide": "Rising output PPI = cost pressures passing through. +2 above 4% · +1 above 2% · 0 flat · -1 falling · -2 deflation."
+          },
+          {
+            "num": 10,
+            "id": "coreppi",
+            "hub_name": "Core PPI",
+            "measure": "UK Core PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices/bulletins/producerpriceinflation/latest",
+            "where_to_find": "Same ONS PPI bulletin → Look for 'excluding food, beverages, tobacco and petroleum' — Core Output PPI.",
+            "scoring_guide": "Strips out energy and food. Most reliable signal of underlying cost pressure. Same scoring as headline PPI."
+          },
+          {
+            "num": 11,
+            "id": "employ",
+            "hub_name": "Employment",
+            "measure": "UK Employment / Labour Market",
+            "category": "Labour Market",
+            "source_url": "https://www.ons.gov.uk/employmentandlabourmarket",
+            "where_to_find": "ONS Labour Market → Latest release → Employment change AND unemployment rate %. Both matter.",
+            "scoring_guide": "Strong employment + low unemployment = BoE hawkish. BoE also watches wage growth closely."
+          },
+          {
+            "num": 12,
+            "id": "debtgdp",
+            "hub_name": "Government Debt / GDP",
+            "measure": "UK Govt Debt / GDP",
+            "category": "Fiscal Health",
+            "source_url": "https://www.ons.gov.uk/economy/governmentpublicsectorandtaxes/publicspending",
+            "where_to_find": "ONS Public Sector Finances → Public sector net debt as % of GDP. Note current level and trend.",
+            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising · -2 rapid deterioration."
+          },
+          {
+            "num": 13,
+            "id": "fiscal",
+            "hub_name": "Fiscal Balance",
+            "measure": "UK Fiscal Balance",
+            "category": "Fiscal Health",
+            "source_url": "https://www.ons.gov.uk/economy/governmentpublicsectorandtaxes/publicsectorfinance",
+            "where_to_find": "ONS Public Sector Finances → Monthly borrowing figure (PSNB) and annual position.",
+            "scoring_guide": "+1 surplus or improving · 0 stable · -1 deficit widening · -2 sharply worsening."
+          },
+          {
+            "num": 14,
+            "id": "yield10",
+            "hub_name": "10-Year Government Bond Yield",
+            "measure": "10-Year Gilt Yield",
+            "category": "Rates / Expectations",
+            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01GBM156N",
+            "where_to_find": "FRED → UK 10Y government bond yield → Note current level and weekly direction.",
+            "scoring_guide": "+2 rising = higher GBP return = capital attracted · +1 mild rise · 0 flat · -1 falling · -2 sharp fall."
+          },
+          {
+            "num": 15,
+            "id": "cbbs",
+            "hub_name": "Central Bank Balance Sheet / GDP",
+            "measure": "BoE Balance Sheet / GDP",
+            "category": "Central Bank",
+            "source_url": "https://www.bankofengland.co.uk/statistics/balance-sheet",
+            "where_to_find": "BoE Balance Sheet statistics → Total assets value. Compare trend — expanding (QE) or shrinking (QT)?",
+            "scoring_guide": "+2 QT (shrinking) = hawkish · +1 stable · 0 flat · -1 slow expansion · -2 aggressive QE."
+          }
+        ]
+      },
+      "JPY": {
+        "name": "Japanese Yen",
+        "flag": "🇯🇵",
+        "central_bank": "Bank of Japan (BoJ)",
+        "indicators": [
+          {
+            "num": 1,
+            "id": "mfgpmi",
+            "hub_name": "Manufacturing PMI",
+            "measure": "Japan Manufacturing PMI",
+            "category": "Growth / Production",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "S&P Global PMI → Filter 'Japan Manufacturing' → PMI headline figure in latest release.",
+            "scoring_guide": "Japan PMI tracks China demand. Same +2/+1/0/-1/-2 scoring vs 50 threshold."
+          },
+          {
+            "num": 2,
+            "id": "svspmi",
+            "hub_name": "Services PMI",
+            "measure": "Japan Services PMI",
+            "category": "Growth / Demand",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "Same site → Filter 'Japan Services' or 'Japan Composite' → PMI headline figure.",
+            "scoring_guide": "Japan services sector has been resilient. +2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+          },
+          {
+            "num": 3,
+            "id": "sentiment",
+            "hub_name": "Consumer Sentiment",
+            "measure": "Japan Consumer Confidence",
+            "category": "Demand / Confidence",
+            "source_url": "https://www.esri.cao.go.jp/en/stat/shouhi/shouhi-e.html",
+            "where_to_find": "ESRI Japan → Consumer Confidence Survey → Monthly index number. Above 40 = positive sentiment.",
+            "scoring_guide": "+2 above 44 & rising · +1 above 40 · 0 35-40 · -1 below 35 · -2 below 30 & falling sharply."
+          },
+          {
+            "num": 4,
+            "id": "permits",
+            "hub_name": "Building Permits / Housing",
+            "measure": "Japan Building Permits",
+            "category": "Growth / Housing",
+            "source_url": "https://www.mlit.go.jp/en/statistics/",
+            "where_to_find": "Japan Ministry of Land Infrastructure → Housing starts / permits data. Monthly figure in thousands.",
+            "scoring_guide": "+1 rising vs prior year · 0 stable · -1 falling · -2 sharp decline. Leads GDP by several months."
+          },
+          {
+            "num": 5,
+            "id": "m2",
+            "hub_name": "M2 Money Supply",
+            "measure": "Japan M2 Money Supply",
+            "category": "Monetary Conditions",
+            "source_url": "https://fred.stlouisfed.org/series/MYAGM2JPM189S",
+            "where_to_find": "FRED → Japan M2 series → Annual growth rate. Check if expanding or contracting.",
+            "scoring_guide": "+2 growing >4% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+          },
+          {
+            "num": 6,
+            "id": "cbrate",
+            "hub_name": "Central Bank Rate & Current Policy Stance",
+            "measure": "BoJ Policy Rate / Stance",
+            "category": "Central Bank",
+            "source_url": "https://www.boj.or.jp/en/mopo/mpmdeci/state/index.htm/",
+            "where_to_find": "BoJ Monetary Policy → Latest statement → Policy-Rate Balance or Uncollateralised Overnight Call Rate.",
+            "scoring_guide": "+2 hiking cycle (rare, major JPY bullish signal) · +1 hawkish hold · 0 neutral · -1 maintaining loose policy · -2 ultra-dovish / negative rates."
+          },
+          {
+            "num": 7,
+            "id": "cpi",
+            "hub_name": "CPI YoY",
+            "measure": "Japan CPI YoY",
+            "category": "Inflation",
+            "source_url": "https://www.stat.go.jp/english/data/cpi/",
+            "where_to_find": "Statistics Bureau Japan → CPI latest release → 'All items' year-on-year % change.",
+            "scoring_guide": "Historically deflationary. +2 above 2.5% sustained · +1 above 2% · 0 near 2% · -1 below 1% · -2 negative (deflation)."
+          },
+          {
+            "num": 8,
+            "id": "corecpi",
+            "hub_name": "Core CPI",
+            "measure": "Japan Core CPI YoY",
+            "category": "Underlying Inflation",
+            "source_url": "https://www.stat.go.jp/english/data/cpi/",
+            "where_to_find": "Same Statistics Bureau page → 'All items less fresh food' = Japan Core CPI. Annual % change.",
+            "scoring_guide": "BoJ watches core CPI (ex-fresh food). Sustained above 2% = BoJ hike signal = JPY bullish."
+          },
+          {
+            "num": 9,
+            "id": "ppi",
+            "hub_name": "PPI",
+            "measure": "Japan PPI / CGPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.boj.or.jp/en/statistics/pi/cgpi/index.htm/",
+            "where_to_find": "BoJ CGPI (Corporate Goods Price Index) → Annual rate in the latest release.",
+            "scoring_guide": "Rising CGPI = import inflation passing through = can support BoJ normalization."
+          },
+          {
+            "num": 10,
+            "id": "coreppi",
+            "hub_name": "Core PPI",
+            "measure": "Japan Core CGPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.boj.or.jp/en/statistics/pi/cgpi/index.htm/",
+            "where_to_find": "Same BoJ CGPI page → Domestic CGPI ex energy — core pipeline pressure.",
+            "scoring_guide": "Core CGPI ex-energy is BoJ's cleaner pipeline signal. Rising = inflationary pressure building."
+          },
+          {
+            "num": 11,
+            "id": "employ",
+            "hub_name": "Employment",
+            "measure": "Japan Employment / Jobs Ratio",
+            "category": "Labour Market",
+            "source_url": "https://www.stat.go.jp/english/data/roudou/",
+            "where_to_find": "Statistics Bureau → Labour Force Survey → Unemployment rate % and Jobs-to-applicants ratio (from Ministry of Health).",
+            "scoring_guide": "Jobs-to-applicants above 1.0 = tight labour market. +2 ratio rising sharply · +1 improving · 0 stable · -1 loosening · -2 rising unemployment."
+          },
+          {
+            "num": 12,
+            "id": "debtgdp",
+            "hub_name": "Government Debt / GDP",
+            "measure": "Japan Govt Debt / GDP",
+            "category": "Fiscal Health",
+            "source_url": "https://fred.stlouisfed.org/series/DEBTTLJPA188A",
+            "where_to_find": "FRED → Japan debt/GDP → Annual figure. Japan debt is very high (~260% GDP) — watch trend direction.",
+            "scoring_guide": "0 stable · -1 rising slowly · -2 rising sharply. Note: High absolute level is structural — changes in direction matter most."
+          },
+          {
+            "num": 13,
+            "id": "fiscal",
+            "hub_name": "Fiscal Balance",
+            "measure": "Japan Fiscal Balance",
+            "category": "Fiscal Health",
+            "source_url": "https://www.mof.go.jp/english/policy/budget/budget/index.html",
+            "where_to_find": "Japan MOF → Budget page → Annual fiscal surplus/deficit as % of GDP.",
+            "scoring_guide": "+1 improving deficit · 0 stable · -1 worsening · -2 sharply deteriorating."
+          },
+          {
+            "num": 14,
+            "id": "yield10",
+            "hub_name": "10-Year Government Bond Yield",
+            "measure": "10-Year JGB Yield",
+            "category": "Rates / Expectations",
+            "source_url": "https://www.mof.go.jp/english/policy/jgbs/reference/interest_rate/index.htm",
+            "where_to_find": "Japan Ministry of Finance → JGB yields table → Find '10-year' row. Note current yield and direction.",
+            "scoring_guide": "+2 rising = BoJ normalization = JPY bullish · +1 mild rise · 0 flat · -1 falling → -2 BoJ capping yields (YCC) = JPY bearish."
+          },
+          {
+            "num": 15,
+            "id": "cbbs",
+            "hub_name": "Central Bank Balance Sheet / GDP",
+            "measure": "BoJ Balance Sheet / GDP",
+            "category": "Central Bank",
+            "source_url": "https://fred.stlouisfed.org/series/JPNASSETS",
+            "where_to_find": "FRED → Japan central bank assets → Is BoJ balance sheet expanding (QE/YCC) or shrinking (normalization)?",
+            "scoring_guide": "+2 shrinking (normalization/hawkish) · +1 stable · 0 flat · -1 slowly growing · -2 aggressive expansion = JPY bearish."
+          }
+        ]
+      },
+      "CHF": {
+        "name": "Swiss Franc",
+        "flag": "🇨🇭",
+        "central_bank": "Swiss National Bank (SNB)",
+        "indicators": [
+          {
+            "num": 1,
+            "id": "mfgpmi",
+            "hub_name": "Manufacturing PMI",
+            "measure": "Switzerland Manufacturing PMI",
+            "category": "Growth / Production",
+            "source_url": "https://www.procure.ch/magazin/artikel/swiss-pmi/",
+            "where_to_find": "Procure.ch → Latest PMI release. Site may be in German — look for the numeric PMI value in the headline.",
+            "scoring_guide": "Swiss PMI mirrors Eurozone trends. Same +2/+1/0/-1/-2 scoring vs 50 threshold."
+          },
+          {
+            "num": 2,
+            "id": "svspmi",
+            "hub_name": "Services PMI",
+            "measure": "Switzerland Services PMI",
+            "category": "Growth / Demand",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "S&P Global PMI → Filter 'Switzerland Services' → PMI headline figure.",
+            "scoring_guide": "Switzerland is a service-dominated economy. Services PMI above 50 = expansion."
+          },
+          {
+            "num": 3,
+            "id": "sentiment",
+            "hub_name": "Consumer Sentiment",
+            "measure": "Swiss Consumer Confidence",
+            "category": "Demand / Confidence",
+            "source_url": "https://www.seco.admin.ch/seco/en/home/wirtschaftslage---wirtschaftspolitik/Wirtschaftslage/Konsumentenstimmung.html",
+            "where_to_find": "SECO → Consumer Sentiment → Quarterly index. Negative values are normal for Switzerland.",
+            "scoring_guide": "+2 strongly rising · +1 improving · 0 stable · -1 falling · -2 sharply deteriorating."
+          },
+          {
+            "num": 4,
+            "id": "permits",
+            "hub_name": "Building Permits / Housing",
+            "measure": "Swiss Building Permits",
+            "category": "Growth / Housing",
+            "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/construction-housing.html",
+            "where_to_find": "Swiss Federal Statistics → Construction → Building permits latest monthly figure.",
+            "scoring_guide": "+1 rising · 0 stable · -1 falling · -2 sharply declining. Swiss housing market is stable — changes matter."
+          },
+          {
+            "num": 5,
+            "id": "m2",
+            "hub_name": "M2 Money Supply",
+            "measure": "Swiss M2 Money Supply",
+            "category": "Monetary Conditions",
+            "source_url": "https://fred.stlouisfed.org/series/MYAGM2CHM189S",
+            "where_to_find": "FRED → Switzerland M2 series → Annual growth rate. Note if expanding or contracting.",
+            "scoring_guide": "+2 growing >4% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+          },
+          {
+            "num": 6,
+            "id": "cbrate",
+            "hub_name": "Central Bank Rate & Current Policy Stance",
+            "measure": "SNB Policy Rate / Stance",
+            "category": "Central Bank",
+            "source_url": "https://www.snb.ch/en/the-snb/mandates-goals/statistics/statistics-pub/current_interest_exchange_rates",
+            "where_to_find": "SNB → 'SNB policy rate' in the interest rate table. Check latest quarterly assessment for direction.",
+            "scoring_guide": "+2 hiking · +1 hawkish hold · 0 neutral hold · -1 dovish lean · -2 cutting or considering negative rates."
+          },
+          {
+            "num": 7,
+            "id": "cpi",
+            "hub_name": "CPI YoY",
+            "measure": "Switzerland CPI YoY",
+            "category": "Inflation",
+            "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/prices/consumer-price-index.html",
+            "where_to_find": "Swiss Federal Statistics → CPI → Annual % change rate in the latest release.",
+            "scoring_guide": "SNB targets 0-2%. +2 above 2% rising · +1 above 1.5% · 0 near 1% · -1 below 0.5% · -2 below 0% (deflation risk)."
+          },
+          {
+            "num": 8,
+            "id": "corecpi",
+            "hub_name": "Core CPI",
+            "measure": "Switzerland Core CPI YoY",
+            "category": "Underlying Inflation",
+            "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/prices/consumer-price-index.html",
+            "where_to_find": "Same Swiss Statistics CPI page → Core CPI (ex energy and seasonal items) annual % change.",
+            "scoring_guide": "Swiss core CPI rarely spikes. Watch for any sustained rise above 1.5% = rare hawkish SNB signal."
+          },
+          {
+            "num": 9,
+            "id": "ppi",
+            "hub_name": "PPI",
+            "measure": "Swiss PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/prices/producer-import-price-index.html",
+            "where_to_find": "Swiss Federal Statistics → Producer & Import Price Index → Annual % change.",
+            "scoring_guide": "Swiss PPI includes import prices — important given CHF's impact on import costs."
+          },
+          {
+            "num": 10,
+            "id": "coreppi",
+            "hub_name": "Core PPI",
+            "measure": "Swiss Core PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/prices/producer-import-price-index.html",
+            "where_to_find": "Same page → Domestic producer prices only (ex imports) — this is closer to core PPI.",
+            "scoring_guide": "Domestic price pressure ex imports. Rising = modest inflationary signal for SNB."
+          },
+          {
+            "num": 11,
+            "id": "employ",
+            "hub_name": "Employment",
+            "measure": "Switzerland Employment",
+            "category": "Labour Market",
+            "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/work-income/employment-working-hours.html",
+            "where_to_find": "Swiss Federal Statistics → Employment → Quarterly employment figures and unemployment rate.",
+            "scoring_guide": "Switzerland has one of the lowest unemployment rates globally. +2 very low & stable · 0 normal · -1 rising · -2 sharply rising."
+          },
+          {
+            "num": 12,
+            "id": "debtgdp",
+            "hub_name": "Government Debt / GDP",
+            "measure": "Swiss Govt Debt / GDP",
+            "category": "Fiscal Health",
+            "source_url": "https://fred.stlouisfed.org/series/DEBTTLCHA188A",
+            "where_to_find": "FRED → Switzerland debt/GDP → Annual figure. Switzerland typically has very low debt — watch trend.",
+            "scoring_guide": "+2 declining (already very low) · +1 stable · 0 slowly rising · -1 rising · -2 rising sharply."
+          },
+          {
+            "num": 13,
+            "id": "fiscal",
+            "hub_name": "Fiscal Balance",
+            "measure": "Swiss Fiscal Balance",
+            "category": "Fiscal Health",
+            "source_url": "https://www.efv.admin.ch/efv/en/home/finanzberichterstattung/bundeshaushalt_aktuell.html",
+            "where_to_find": "Swiss Federal Finance → Confederation budget → Surplus/deficit figures.",
+            "scoring_guide": "Switzerland often runs surpluses. +2 surplus · +1 near-balance · 0 small deficit · -1 widening deficit · -2 large deficit."
+          },
+          {
+            "num": 14,
+            "id": "yield10",
+            "hub_name": "10-Year Government Bond Yield",
+            "measure": "10-Year Swiss Govt Bond Yield",
+            "category": "Rates / Expectations",
+            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01CHM156N",
+            "where_to_find": "FRED → Switzerland 10Y yield → Note current level and weekly direction.",
+            "scoring_guide": "Swiss yields can go negative. +2 rising = return improving · +1 mild rise · 0 flat · -1 falling · -2 negative or sharply falling."
+          },
+          {
+            "num": 15,
+            "id": "cbbs",
+            "hub_name": "Central Bank Balance Sheet / GDP",
+            "measure": "SNB Balance Sheet / GDP",
+            "category": "Central Bank",
+            "source_url": "https://www.snb.ch/en/the-snb/mandates-goals/statistics/statistics-pub/balance_sheet",
+            "where_to_find": "SNB Balance Sheet → Total assets. SNB has one of the largest balance sheets relative to GDP globally.",
+            "scoring_guide": "+2 shrinking · +1 stable · 0 flat · -1 growing (FX intervention) · -2 large expansion = CHF dilution."
+          }
+        ]
+      },
+      "CAD": {
+        "name": "Canadian Dollar",
+        "flag": "🇨🇦",
+        "central_bank": "Bank of Canada (BoC)",
+        "indicators": [
+          {
+            "num": 1,
+            "id": "mfgpmi",
+            "hub_name": "Manufacturing PMI",
+            "measure": "Canada Manufacturing PMI",
+            "category": "Growth / Production",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "S&P Global PMI → Filter 'Canada Manufacturing' → PMI headline figure in latest release.",
+            "scoring_guide": "Heavily linked to US demand and commodity prices. Same threshold scoring vs 50."
+          },
+          {
+            "num": 2,
+            "id": "svspmi",
+            "hub_name": "Services PMI",
+            "measure": "Canada Services PMI",
+            "category": "Growth / Demand",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "Same site → Filter 'Canada Services' → PMI headline figure.",
+            "scoring_guide": "+2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+          },
+          {
+            "num": 3,
+            "id": "sentiment",
+            "hub_name": "Consumer Sentiment",
+            "measure": "Canada Consumer Confidence",
+            "category": "Demand / Confidence",
+            "source_url": "https://www.conferenceboard.ca/topics/economics/canadian-consumer-confidence/",
+            "where_to_find": "Conference Board of Canada → Consumer Confidence Index. Monthly headline figure.",
+            "scoring_guide": "+2 strongly rising · +1 improving · 0 stable · -1 falling · -2 sharply deteriorating."
+          },
+          {
+            "num": 4,
+            "id": "permits",
+            "hub_name": "Building Permits / Housing",
+            "measure": "Canada Building Permits",
+            "category": "Growth / Housing",
+            "source_url": "https://www150.statcan.gc.ca/n1/pub/71-607-x/71-607-x2018008-eng.htm",
+            "where_to_find": "Statistics Canada → Building permits → Monthly value in billions of dollars.",
+            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 stable · -1 falling · -2 sharp decline. Canada housing = key economic driver."
+          },
+          {
+            "num": 5,
+            "id": "m2",
+            "hub_name": "M2 Money Supply",
+            "measure": "Canada M2 Money Supply",
+            "category": "Monetary Conditions",
+            "source_url": "https://fred.stlouisfed.org/series/MYAGM2CAM189S",
+            "where_to_find": "FRED → Canada M2 series → Annual growth rate. Note if expanding or contracting.",
+            "scoring_guide": "+2 growing >5% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+          },
+          {
+            "num": 6,
+            "id": "cbrate",
+            "hub_name": "Central Bank Rate & Current Policy Stance",
+            "measure": "BoC Overnight Rate / Stance",
+            "category": "Central Bank",
+            "source_url": "https://www.bankofcanada.ca/core-functions/monetary-policy/key-interest-rate/",
+            "where_to_find": "Bank of Canada → Target overnight rate shown in LARGE TEXT at top. Check latest statement for direction.",
+            "scoring_guide": "+2 hiking · +1 hawkish hold · 0 neutral hold · -1 dovish lean · -2 cutting cycle."
+          },
+          {
+            "num": 7,
+            "id": "cpi",
+            "hub_name": "CPI YoY",
+            "measure": "Canada CPI YoY",
+            "category": "Inflation",
+            "source_url": "https://www150.statcan.gc.ca/n1/en/subjects/prices_and_price_indexes/consumer_price_indexes",
+            "where_to_find": "Statistics Canada → Consumer Price Index → '12-month change, All-items' % in the latest release.",
+            "scoring_guide": "BoC targets 2%. +2 above 3.5% · +1 above 2.5% · 0 near 2% · -1 below 1.5% · -2 below 1%."
+          },
+          {
+            "num": 8,
+            "id": "corecpi",
+            "hub_name": "Core CPI",
+            "measure": "Canada Core CPI (Trim/Median)",
+            "category": "Underlying Inflation",
+            "source_url": "https://www.bankofcanada.ca/rates/indicators/capacity-and-inflation-pressures/inflation/",
+            "where_to_find": "BoC Inflation page → CPI-Trim and CPI-Median both shown. Record both and average them.",
+            "scoring_guide": "BoC uses BOTH trim and median as core measures. Both above 2.5% = hawkish. Both falling = dovish."
+          },
+          {
+            "num": 9,
+            "id": "ppi",
+            "hub_name": "PPI",
+            "measure": "Canada PPI (IPPI) YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www150.statcan.gc.ca/n1/en/subjects/prices_and_price_indexes/industrial_product_price_indexes",
+            "where_to_find": "Statistics Canada → Industrial Product Price Index (IPPI) → Annual % change.",
+            "scoring_guide": "IPPI leads CPI by 1-3 months. Rising = inflationary pipeline = BoC stays hawkish."
+          },
+          {
+            "num": 10,
+            "id": "coreppi",
+            "hub_name": "Core PPI",
+            "measure": "Canada Core IPPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www150.statcan.gc.ca/n1/en/subjects/prices_and_price_indexes/industrial_product_price_indexes",
+            "where_to_find": "Same Statistics Canada page → IPPI ex-energy or ex-petroleum products — this approximates core IPPI.",
+            "scoring_guide": "Core IPPI strips out oil volatility. Rising steadily = underlying inflationary pressure."
+          },
+          {
+            "num": 11,
+            "id": "employ",
+            "hub_name": "Employment",
+            "measure": "Canada Employment (LFS)",
+            "category": "Labour Market",
+            "source_url": "https://www150.statcan.gc.ca/n1/en/type/data?text=Labour%20Force%20Survey",
+            "where_to_find": "Statistics Canada → Labour Force Survey → Employment change in thousands AND unemployment rate %.",
+            "scoring_guide": "+2 strong jobs beat + falling unemployment · +1 beat · 0 in line · -1 miss · -2 large miss."
+          },
+          {
+            "num": 12,
+            "id": "debtgdp",
+            "hub_name": "Government Debt / GDP",
+            "measure": "Canada Govt Debt / GDP",
+            "category": "Fiscal Health",
+            "source_url": "https://fred.stlouisfed.org/series/DEBTTLCAA188A",
+            "where_to_find": "FRED → Canada debt/GDP series → Annual figure and trend direction.",
+            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising · -2 rapidly rising."
+          },
+          {
+            "num": 13,
+            "id": "fiscal",
+            "hub_name": "Fiscal Balance",
+            "measure": "Canada Fiscal Balance",
+            "category": "Fiscal Health",
+            "source_url": "https://www.canada.ca/en/department-finance/services/publications/fiscal-monitor.html",
+            "where_to_find": "Finance Canada → Fiscal Monitor → Monthly surplus/deficit figures.",
+            "scoring_guide": "+1 surplus or improving · 0 stable · -1 deficit widening · -2 sharply worsening."
+          },
+          {
+            "num": 14,
+            "id": "yield10",
+            "hub_name": "10-Year Government Bond Yield",
+            "measure": "10-Year Canada Govt Bond Yield",
+            "category": "Rates / Expectations",
+            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01CAM156N",
+            "where_to_find": "FRED → Canada 10Y yield → Note current level and weekly direction vs US 10Y.",
+            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 flat · -1 falling · -2 sharply falling."
+          },
+          {
+            "num": 15,
+            "id": "cbbs",
+            "hub_name": "Central Bank Balance Sheet / GDP",
+            "measure": "BoC Balance Sheet / GDP",
+            "category": "Central Bank",
+            "source_url": "https://www.bankofcanada.ca/rates/banking-and-financial-statistics/bank-of-canada-assets-and-liabilities-weekly-wednesday/",
+            "where_to_find": "BoC weekly balance sheet → Total assets. Note if shrinking (QT) or growing (QE).",
+            "scoring_guide": "+2 shrinking (QT) · +1 stable · 0 flat · -1 slowly growing · -2 aggressive expansion."
+          }
+        ]
+      },
+      "AUD": {
+        "name": "Australian Dollar",
+        "flag": "🇦🇺",
+        "central_bank": "Reserve Bank of Australia (RBA)",
+        "indicators": [
+          {
+            "num": 1,
+            "id": "mfgpmi",
+            "hub_name": "Manufacturing PMI",
+            "measure": "Australia Manufacturing PMI",
+            "category": "Growth / Production",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "S&P Global PMI → Filter 'Australia Manufacturing' (Judo Bank PMI) → PMI headline figure.",
+            "scoring_guide": "AUD PMI tracks China demand. Same +2/+1/0/-1/-2 scoring vs 50 threshold."
+          },
+          {
+            "num": 2,
+            "id": "svspmi",
+            "hub_name": "Services PMI",
+            "measure": "Australia Services PMI",
+            "category": "Growth / Demand",
+            "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
+            "where_to_find": "Same site → Filter 'Australia Services' (Judo Bank) → PMI headline figure.",
+            "scoring_guide": "+2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+          },
+          {
+            "num": 3,
+            "id": "sentiment",
+            "hub_name": "Consumer Sentiment",
+            "measure": "Australia Consumer Confidence",
+            "category": "Demand / Confidence",
+            "source_url": "https://www.westpac.com.au/about-westpac/media/media-releases/2024/",
+            "where_to_find": "Westpac-Melbourne Institute Consumer Sentiment → Monthly index. Below 100 = pessimistic majority.",
+            "scoring_guide": "+2 above 105 & rising · +1 above 100 · 0 near 100 · -1 below 95 · -2 below 90 & falling."
+          },
+          {
+            "num": 4,
+            "id": "permits",
+            "hub_name": "Building Permits / Housing",
+            "measure": "Australia Building Approvals",
+            "category": "Growth / Housing",
+            "source_url": "https://www.abs.gov.au/statistics/industry/building-and-construction/building-approvals-australia",
+            "where_to_find": "ABS Building Approvals → Monthly number of dwellings approved. Note % change vs prior month.",
+            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 stable · -1 falling · -2 sharp decline."
+          },
+          {
+            "num": 5,
+            "id": "m2",
+            "hub_name": "M2 Money Supply",
+            "measure": "Australia M2 Money Supply",
+            "category": "Monetary Conditions",
+            "source_url": "https://fred.stlouisfed.org/series/MYAGM2AUM189S",
+            "where_to_find": "FRED → Australia M2 series → Annual growth rate.",
+            "scoring_guide": "+2 growing >6% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+          },
+          {
+            "num": 6,
+            "id": "cbrate",
+            "hub_name": "Central Bank Rate & Current Policy Stance",
+            "measure": "RBA Cash Rate / Stance",
+            "category": "Central Bank",
+            "source_url": "https://www.rba.gov.au/statistics/cash-rate/",
+            "where_to_find": "RBA → Cash rate target shown in LARGE COLOURED BOX at top. Check latest statement for direction.",
+            "scoring_guide": "+2 hiking cycle · +1 hawkish hold · 0 neutral hold · -1 dovish lean · -2 cutting cycle."
+          },
+          {
+            "num": 7,
+            "id": "cpi",
+            "hub_name": "CPI YoY",
+            "measure": "Australia CPI YoY",
+            "category": "Inflation",
+            "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia",
+            "where_to_find": "ABS → CPI latest release → 'All groups CPI' annual % change in the highlighted box.",
+            "scoring_guide": "RBA targets 2-3%. +2 above 4% · +1 above 3% · 0 in 2-3% band · -1 below 2% · -2 below 1.5%."
+          },
+          {
+            "num": 8,
+            "id": "corecpi",
+            "hub_name": "Core CPI",
+            "measure": "Australia Core CPI (Trimmed Mean)",
+            "category": "Underlying Inflation",
+            "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia",
+            "where_to_find": "Same ABS CPI release → 'Trimmed mean' annual % change — this is RBA's preferred core measure.",
+            "scoring_guide": "RBA watches trimmed mean most closely. Above 3% = hawkish. Falling toward 2.5% = dovish lean."
+          },
+          {
+            "num": 9,
+            "id": "ppi",
+            "hub_name": "PPI",
+            "measure": "Australia PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/producer-price-indexes-australia",
+            "where_to_find": "ABS PPI → Producer Price Index quarterly release → Annual % change for final demand.",
+            "scoring_guide": "Rising PPI = inflationary pipeline building. Quarterly release — use last available if no new data."
+          },
+          {
+            "num": 10,
+            "id": "coreppi",
+            "hub_name": "Core PPI",
+            "measure": "Australia Core PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/producer-price-indexes-australia",
+            "where_to_find": "Same ABS PPI release → Domestic final demand PPI ex-energy (if available) or manufacturing output prices.",
+            "scoring_guide": "Core pipeline pressure ex-commodities. Rising = inflationary environment building."
+          },
+          {
+            "num": 11,
+            "id": "employ",
+            "hub_name": "Employment",
+            "measure": "Australia Employment (LFS)",
+            "category": "Labour Market",
+            "source_url": "https://www.abs.gov.au/statistics/labour/employment-and-unemployment/labour-force-australia",
+            "where_to_find": "ABS Labour Force → Employment change in thousands AND unemployment rate %. Both shown in headline.",
+            "scoring_guide": "+2 strong beat + falling unemployment · +1 beat · 0 in line · -1 miss · -2 large miss."
+          },
+          {
+            "num": 12,
+            "id": "debtgdp",
+            "hub_name": "Government Debt / GDP",
+            "measure": "Australia Govt Debt / GDP",
+            "category": "Fiscal Health",
+            "source_url": "https://fred.stlouisfed.org/series/DEBTTLAUA188A",
+            "where_to_find": "FRED → Australia debt/GDP → Annual figure and trend direction.",
+            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising · -2 rapidly rising."
+          },
+          {
+            "num": 13,
+            "id": "fiscal",
+            "hub_name": "Fiscal Balance",
+            "measure": "Australia Fiscal Balance",
+            "category": "Fiscal Health",
+            "source_url": "https://budget.gov.au/",
+            "where_to_find": "Australian Government Budget → Mid-Year Economic & Fiscal Outlook → Underlying cash balance.",
+            "scoring_guide": "+2 surplus · +1 near surplus · 0 small deficit · -1 widening deficit · -2 large worsening deficit."
+          },
+          {
+            "num": 14,
+            "id": "yield10",
+            "hub_name": "10-Year Government Bond Yield",
+            "measure": "10-Year ACGB Yield",
+            "category": "Rates / Expectations",
+            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01AUM156N",
+            "where_to_find": "FRED → Australia 10Y government bond yield → Note current level and weekly direction.",
+            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 flat · -1 falling · -2 sharply falling."
+          },
+          {
+            "num": 15,
+            "id": "cbbs",
+            "hub_name": "Central Bank Balance Sheet / GDP",
+            "measure": "RBA Balance Sheet / GDP",
+            "category": "Central Bank",
+            "source_url": "https://www.rba.gov.au/statistics/frequency/balance-sheet.html",
+            "where_to_find": "RBA Balance Sheet → Total assets. Note if shrinking (post-QE normalisation) or stable.",
+            "scoring_guide": "+2 shrinking (normalising) · +1 stable · 0 flat · -1 slowly growing · -2 aggressive expansion."
+          }
+        ]
+      },
+      "NZD": {
+        "name": "New Zealand Dollar",
+        "flag": "🇳🇿",
+        "central_bank": "Reserve Bank of New Zealand (RBNZ)",
+        "indicators": [
+          {
+            "num": 1,
+            "id": "mfgpmi",
+            "hub_name": "Manufacturing PMI",
+            "measure": "NZ Manufacturing PMI (BusinessNZ)",
+            "category": "Growth / Production",
+            "source_url": "https://businessnz.org.nz/business-nz-pmi/",
+            "where_to_find": "BusinessNZ → Latest PMI release → PMI headline number in the title or first paragraph.",
+            "scoring_guide": "NZ PMI often moves with AUD PMI. Same +2/+1/0/-1/-2 scoring vs 50 threshold."
+          },
+          {
+            "num": 2,
+            "id": "svspmi",
+            "hub_name": "Services PMI",
+            "measure": "NZ Services PMI (BusinessNZ)",
+            "category": "Growth / Demand",
+            "source_url": "https://businessnz.org.nz/business-nz-bni/",
+            "where_to_find": "BusinessNZ → Business NZ Performance of Services Index (PSI) → Latest release headline figure.",
+            "scoring_guide": "+2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+          },
+          {
+            "num": 3,
+            "id": "sentiment",
+            "hub_name": "Consumer Sentiment",
+            "measure": "NZ Consumer Confidence (ANZ-Roy Morgan)",
+            "category": "Demand / Confidence",
+            "source_url": "https://www.anz.co.nz/about-us/economic-markets-research/",
+            "where_to_find": "ANZ New Zealand → ANZ-Roy Morgan Consumer Confidence report → Monthly headline index.",
+            "scoring_guide": "+2 above 120 & rising · +1 above 110 · 0 near 100 · -1 below 95 · -2 below 90 & falling."
+          },
+          {
+            "num": 4,
+            "id": "permits",
+            "hub_name": "Building Permits / Housing",
+            "measure": "NZ Building Consents",
+            "category": "Growth / Housing",
+            "source_url": "https://www.stats.govt.nz/topics/building-consents",
+            "where_to_find": "Stats NZ → Building consents → Monthly number of new dwellings consented. Note % change.",
+            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 stable · -1 falling · -2 sharp decline."
+          },
+          {
+            "num": 5,
+            "id": "m2",
+            "hub_name": "M2 Money Supply",
+            "measure": "NZ M2 Money Supply",
+            "category": "Monetary Conditions",
+            "source_url": "https://fred.stlouisfed.org/series/MYAGM2NZM189S",
+            "where_to_find": "FRED → New Zealand M2 series → Annual growth rate.",
+            "scoring_guide": "+2 growing >5% · +1 moderate · 0 flat · -1 contracting · -2 sharply contracting."
+          },
+          {
+            "num": 6,
+            "id": "cbrate",
+            "hub_name": "Central Bank Rate & Current Policy Stance",
+            "measure": "RBNZ OCR / Stance",
+            "category": "Central Bank",
+            "source_url": "https://www.rbnz.govt.nz/monetary-policy/about-monetary-policy/official-cash-rate",
+            "where_to_find": "RBNZ → Official Cash Rate shown prominently at top. Check latest MPS for direction.",
+            "scoring_guide": "+2 hiking · +1 hawkish hold · 0 neutral hold · -1 dovish lean · -2 cutting cycle."
+          },
+          {
+            "num": 7,
+            "id": "cpi",
+            "hub_name": "CPI YoY",
+            "measure": "NZ CPI YoY",
+            "category": "Inflation",
+            "source_url": "https://www.stats.govt.nz/topics/price-indexes",
+            "where_to_find": "Stats NZ → Consumer Price Index → Annual CPI % change in highlighted box.",
+            "scoring_guide": "RBNZ targets 1-3%. +2 above 3.5% · +1 above 3% · 0 in 1-3% band · -1 below 1.5% · -2 below 1%."
+          },
+          {
+            "num": 8,
+            "id": "corecpi",
+            "hub_name": "Core CPI",
+            "measure": "NZ Core CPI (Non-Tradables)",
+            "category": "Underlying Inflation",
+            "source_url": "https://www.stats.govt.nz/topics/price-indexes",
+            "where_to_find": "Same Stats NZ CPI release → Non-tradables CPI annual % change (domestic inflation component).",
+            "scoring_guide": "Non-tradables = domestic inflation pressure RBNZ can actually control. Above 4% = sticky."
+          },
+          {
+            "num": 9,
+            "id": "ppi",
+            "hub_name": "PPI",
+            "measure": "NZ PPI YoY (Output)",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.stats.govt.nz/topics/producer-price-indexes",
+            "where_to_find": "Stats NZ → Producer Price Index → Quarterly output PPI annual % change.",
+            "scoring_guide": "Quarterly release. Rising output PPI = inflationary pipeline. Use last available if no new data."
+          },
+          {
+            "num": 10,
+            "id": "coreppi",
+            "hub_name": "Core PPI",
+            "measure": "NZ Core PPI YoY",
+            "category": "Pipeline Inflation",
+            "source_url": "https://www.stats.govt.nz/topics/producer-price-indexes",
+            "where_to_find": "Same Stats NZ PPI release → Input PPI ex-energy where available, or manufacturing sector PPI.",
+            "scoring_guide": "Core pipeline pressure. Rising = inflationary conditions building in domestic economy."
+          },
+          {
+            "num": 11,
+            "id": "employ",
+            "hub_name": "Employment",
+            "measure": "NZ Employment (HLFS)",
+            "category": "Labour Market",
+            "source_url": "https://www.stats.govt.nz/topics/labour-market",
+            "where_to_find": "Stats NZ → Household Labour Force Survey (HLFS) → Employment change AND unemployment rate %. Quarterly.",
+            "scoring_guide": "+2 strong beat + falling unemployment · +1 beat · 0 in line · -1 miss · -2 large miss."
+          },
+          {
+            "num": 12,
+            "id": "debtgdp",
+            "hub_name": "Government Debt / GDP",
+            "measure": "NZ Govt Debt / GDP",
+            "category": "Fiscal Health",
+            "source_url": "https://www.treasury.govt.nz/information-and-services/financial-management-and-advice/financial-statements-government",
+            "where_to_find": "NZ Treasury → Financial Statements → Net core Crown debt as % of GDP.",
+            "scoring_guide": "+1 stable or improving · 0 slowly rising · -1 rising · -2 rapidly rising."
+          },
+          {
+            "num": 13,
+            "id": "fiscal",
+            "hub_name": "Fiscal Balance",
+            "measure": "NZ Fiscal Balance",
+            "category": "Fiscal Health",
+            "source_url": "https://www.treasury.govt.nz/information-and-services/financial-management-and-advice/financial-statements-government",
+            "where_to_find": "Same NZ Treasury page → Core Crown residual cash or OBEGAL (operating balance) figure.",
+            "scoring_guide": "+2 surplus · +1 near surplus · 0 small deficit · -1 widening deficit · -2 sharply worsening."
+          },
+          {
+            "num": 14,
+            "id": "yield10",
+            "hub_name": "10-Year Government Bond Yield",
+            "measure": "10-Year NZ Govt Bond Yield",
+            "category": "Rates / Expectations",
+            "source_url": "https://fred.stlouisfed.org/series/IRLTLT01NZM156N",
+            "where_to_find": "FRED → New Zealand 10Y yield → Note current level and direction vs last week.",
+            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 flat · -1 falling · -2 sharply falling."
+          },
+          {
+            "num": 15,
+            "id": "cbbs",
+            "hub_name": "Central Bank Balance Sheet / GDP",
+            "measure": "RBNZ Balance Sheet / GDP",
+            "category": "Central Bank",
+            "source_url": "https://www.rbnz.govt.nz/statistics/series/reserve-bank-balance-sheet",
+            "where_to_find": "RBNZ Balance Sheet → Total assets. Note trend — shrinking post-QE or stable.",
+            "scoring_guide": "+2 shrinking (normalising) · +1 stable · 0 flat · -1 growing · -2 aggressive expansion."
+          }
+        ]
+      }
+    },
+    "total_bias": [
+      {
+        "min": 20,
+        "label": "Attracting capital"
+      },
+      {
+        "min": 8,
+        "label": "Mild bullish"
+      },
+      {
+        "min": -7,
+        "label": "Neutral"
+      },
+      {
+        "min": -19,
+        "label": "Mild bearish"
+      },
+      {
+        "min": -30,
+        "label": "Losing capital"
+      }
+    ]
+  },
+  "carry_trade": {
+    "pairs": [
+      {
+        "funding": "JPY",
+        "target": "USD"
+      },
+      {
+        "funding": "JPY",
+        "target": "CAD"
+      },
+      {
+        "funding": "JPY",
+        "target": "AUD"
+      },
+      {
+        "funding": "CHF",
+        "target": "USD"
+      },
+      {
+        "funding": "CHF",
+        "target": "CAD"
+      },
+      {
+        "funding": "CHF",
+        "target": "AUD"
+      },
+      {
+        "funding": "EUR",
+        "target": "USD"
+      },
+      {
+        "funding": "EUR",
+        "target": "AUD"
+      },
+      {
+        "funding": "USD",
+        "target": "JPY"
+      }
+    ],
+    "real_rate_differential": "(Target policy rate - Target CPI YoY) - (Funding policy rate - Funding CPI YoY)",
+    "fields": [
+      "real_rate_differential",
+      "carry_score (0-10)",
+      "funding_pressure (Low/Medium/High)",
+      "capital_flow (up / down / flat)"
+    ]
+  },
+  "central_banks": {
+    "banks": [
+      "FED",
+      "ECB",
+      "BOE",
+      "BOJ",
+      "SNB",
+      "RBA",
+      "RBNZ",
+      "BOC"
+    ],
+    "fields": [
+      "bias (Hawkish/Neutral/Dovish)",
+      "score (0-10 conviction; 10 max hawkish, 0 max dovish, 5 neutral)",
+      "latest_meeting",
+      "next_meeting",
+      "forward_guidance_note (one sentence)"
+    ]
+  },
+  "exogenous": {
+    "currencies": [
+      "USD",
+      "EUR",
+      "GBP",
+      "JPY",
+      "CHF",
+      "CAD",
+      "AUD",
+      "NZD"
+    ],
+    "facts": [
+      "GDP %",
+      "Current Account % of GDP",
+      "Policy Rate % and direction (Hiking / Hold-Hawkish / Hold-Neutral / Hold-Dovish / Cutting)",
+      "Stock index level and 12-month high"
+    ],
+    "stock_indexes": {
+      "USD": "S&P 500",
+      "EUR": "DAX",
+      "GBP": "FTSE 100",
+      "JPY": "Nikkei 225",
+      "AUD": "ASX 200",
+      "CAD": "TSX",
+      "NZD": "NZX 50",
+      "CHF": "SMI"
+    }
+  },
+  "cot": {
+    "source": "CFTC Traders in Financial Futures (TFF), Leveraged Funds. Released Fridays 3:30 PM ET.",
+    "contract_codes": {
+      "USD": "098662",
+      "EUR": "099741",
+      "GBP": "096742",
+      "JPY": "097741",
+      "AUD": "232741",
+      "CAD": "090741",
+      "NZD": "112741",
+      "CHF": "092741"
+    },
+    "collected_by": "fred_cot_fetcher.py (automatic, no AI prompt)"
+  },
+  "known_gaps": [
+    "Volatility (10% weight) is not collected by the weekly pipeline; it is still entered by hand.",
+    "ISM Manufacturing and Services PMI for the USD are typed in by hand each month (ism_fetcher.py); no free API.",
+    "The Exogenous layer in the pipeline is four structural facts (GDP, current account, policy rate, stock index). Older manual materials list oil, copper, China PMI, VIX, DXY and geopolitics. Decide which is the standard."
+  ]
+}

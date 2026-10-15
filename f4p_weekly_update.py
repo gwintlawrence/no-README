@@ -39,6 +39,8 @@ import anthropic
 import gspread
 from google.oauth2.service_account import Credentials
 
+from f4p_spec import load_spec, indicator_definitions_block
+
 
 CURRENCIES = ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"]
 
@@ -292,9 +294,13 @@ def read_fred_auto_facts(spreadsheet) -> dict:
     return facts
 
 
-def build_prompt(today: str, currency_batch: list, known_facts: dict = None) -> str:
+def build_prompt(today: str, currency_batch: list, known_facts: dict = None, spec: dict = None) -> str:
     indicator_list = "\n".join(f"  {i+1}. {name}" for i, name in enumerate(INDICATORS))
     currency_list = ", ".join(currency_batch)
+    # Per-currency measure, official source and score guide come from f4p_data_spec.json, the same file
+    # the Data Hunt manual prompts and Compare view read, so the Hub and a person doing it by hand are
+    # told the same thing. If the spec cannot be read this is empty and the prompt is exactly what it was before.
+    definitions_block = indicator_definitions_block(spec if spec is not None else load_spec(), currency_batch)
 
     known_facts_block = ""
     if known_facts:
@@ -316,7 +322,7 @@ Produce the LATEST RELEASED data (as of {today}) for these currencies ONLY: {cur
 {known_facts_block}
 For EACH currency, give all 15 indicators in this exact order:
 {indicator_list}
-
+{definitions_block}
 SCORING RULE - use this exact scale, whole numbers only:
 +2 = Strongly supportive for the currency   |   +1 = Mildly supportive
  0 = Neutral / no clear signal              |   -1 = Mildly negative
