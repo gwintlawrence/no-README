@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-15c",
+  "version": "2026-10-15d",
   "about": "Single source of truth for what the F4P Hub collects and how it is scored. The weekly pipeline (f4p_weekly_update.py), the Data Hunt manual prompts and the Data Hunt Compare view all read this file. Change a definition here, run build_prompt_pack.py, and all three agree.",
   "weights_pct": {
     "endogenous": 40,
@@ -78,8 +78,8 @@
             "measure": "Building Permits",
             "category": "Growth / Housing",
             "source_url": "https://fred.stlouisfed.org/series/PERMIT",
-            "where_to_find": "FRED → PERMIT series → The most recent value is shown on the chart (in thousands of units, seasonally adjusted).",
-            "scoring_guide": "+2 if rising month-over-month significantly · +1 mild rise · 0 flat · -1 mild fall · -2 sharp decline.",
+            "where_to_find": "FRED → PERMIT series → read the latest value (thousands of units, seasonally adjusted annual rate) and the value for the same month a year earlier; both are on the chart.",
+            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2 to 10% · 0 within 2% either way · -1 down 2 to 10% · -2 down more than 10%.",
             "hub_series": {
               "series": "PERMIT",
               "calc": "latest value (thousands, seasonally adjusted annual rate)"
@@ -191,9 +191,9 @@
             "hub_name": "Fiscal Balance",
             "measure": "Fiscal Balance (Deficit/Surplus)",
             "category": "Fiscal Health",
-            "source_url": "https://fred.stlouisfed.org/series/FYFSD",
-            "where_to_find": "FRED → FYFSD → Shows federal surplus/deficit. Negative = deficit. Note if it is widening or narrowing.",
-            "scoring_guide": "+1 surplus or narrowing deficit · 0 stable · -1 widening deficit · -2 sharply worsening fiscal position."
+            "source_url": "https://fred.stlouisfed.org/series/FYFSGDA188S",
+            "where_to_find": "FRED → FYFSGDA188S (federal surplus or deficit as a percent of GDP, annual; negative = deficit) → read the latest year and the year before.",
+            "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by more than 0.5 point · 0 deficit moved by 0.5 point or less · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
             "num": 14,
@@ -259,8 +259,8 @@
             "measure": "Building Permits (Germany)",
             "category": "Growth / Housing",
             "source_url": "https://www.destatis.de/EN/Themes/Economy/Construction/Tables/building-permits.html",
-            "where_to_find": "Destatis (German Statistics) → Building permits table → Find latest monthly figure and % change vs prior year.",
-            "scoring_guide": "German permits proxy for EZ construction health. +1 rising · 0 stable · -1 falling · -2 sharply declining."
+            "where_to_find": "Destatis (German Statistics) → Building permits table → Find the latest monthly figure and the same month a year earlier (calculate the % change yourself if the page does not show it).",
+            "scoring_guide": "German permits proxy for EZ construction health. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2 to 10% · 0 within 2% either way · -1 down 2 to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -349,8 +349,8 @@
             "measure": "EZ Fiscal Balance",
             "category": "Fiscal Health",
             "source_url": "https://ec.europa.eu/eurostat/web/government-finance-statistics",
-            "where_to_find": "Same Eurostat page → General government deficit/surplus as % of GDP.",
-            "scoring_guide": "+1 surplus or improving · 0 stable · -1 widening deficit · -2 severe fiscal deterioration."
+            "where_to_find": "Same Eurostat page → General government deficit/surplus as % of GDP. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by more than 0.5 point · 0 deficit moved by 0.5 point or less · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
             "num": 14,
@@ -416,8 +416,8 @@
             "measure": "UK Building Approvals",
             "category": "Growth / Housing",
             "source_url": "https://www.bankofengland.co.uk/statistics/mortgage-lender-and-administrator-statistics",
-            "where_to_find": "BoE Statistics → Mortgage approvals for house purchase. Monthly figure in thousands.",
-            "scoring_guide": "Rising approvals = housing market recovery = confidence. +1 rising · 0 stable · -1 falling · -2 sharply declining."
+            "where_to_find": "BoE Statistics → Mortgage approvals for house purchase. Monthly figure in thousands. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "scoring_guide": "Rising approvals = housing market recovery = confidence. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2 to 10% · 0 within 2% either way · -1 down 2 to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -506,8 +506,8 @@
             "measure": "UK Fiscal Balance",
             "category": "Fiscal Health",
             "source_url": "https://www.ons.gov.uk/economy/governmentpublicsectorandtaxes/publicsectorfinance",
-            "where_to_find": "ONS Public Sector Finances → Monthly borrowing figure (PSNB) and annual position.",
-            "scoring_guide": "+1 surplus or improving · 0 stable · -1 deficit widening · -2 sharply worsening."
+            "where_to_find": "ONS Public Sector Finances → Monthly borrowing figure (PSNB) and annual position. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by more than 0.5 point · 0 deficit moved by 0.5 point or less · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
             "num": 14,
@@ -573,8 +573,8 @@
             "measure": "Japan Building Permits",
             "category": "Growth / Housing",
             "source_url": "https://www.mlit.go.jp/en/statistics/",
-            "where_to_find": "Japan Ministry of Land Infrastructure → Housing starts / permits data. Monthly figure in thousands.",
-            "scoring_guide": "+1 rising vs prior year · 0 stable · -1 falling · -2 sharp decline. Leads GDP by several months."
+            "where_to_find": "Japan Ministry of Land Infrastructure → Housing starts / permits data. Monthly figure in thousands. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "scoring_guide": "Leads GDP by several months. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2 to 10% · 0 within 2% either way · -1 down 2 to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -663,8 +663,8 @@
             "measure": "Japan Fiscal Balance",
             "category": "Fiscal Health",
             "source_url": "https://www.mof.go.jp/english/policy/budget/budget/index.html",
-            "where_to_find": "Japan MOF → Budget page → Annual fiscal surplus/deficit as % of GDP.",
-            "scoring_guide": "+1 improving deficit · 0 stable · -1 worsening · -2 sharply deteriorating."
+            "where_to_find": "Japan MOF → Budget page → Annual fiscal surplus/deficit as % of GDP. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by more than 0.5 point · 0 deficit moved by 0.5 point or less · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
             "num": 14,
@@ -730,8 +730,8 @@
             "measure": "Swiss Building Permits",
             "category": "Growth / Housing",
             "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/construction-housing.html",
-            "where_to_find": "Swiss Federal Statistics → Construction → Building permits latest monthly figure.",
-            "scoring_guide": "+1 rising · 0 stable · -1 falling · -2 sharply declining. Swiss housing market is stable — changes matter."
+            "where_to_find": "Swiss Federal Statistics → Construction → Building permits latest monthly figure. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "scoring_guide": "Swiss housing market is stable — changes matter. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2 to 10% · 0 within 2% either way · -1 down 2 to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -820,8 +820,8 @@
             "measure": "Swiss Fiscal Balance",
             "category": "Fiscal Health",
             "source_url": "https://www.efv.admin.ch/efv/en/home/finanzberichterstattung/bundeshaushalt_aktuell.html",
-            "where_to_find": "Swiss Federal Finance → Confederation budget → Surplus/deficit figures.",
-            "scoring_guide": "Switzerland often runs surpluses. +2 surplus · +1 near-balance · 0 small deficit · -1 widening deficit · -2 large deficit."
+            "where_to_find": "Swiss Federal Finance → Confederation budget → Surplus/deficit figures. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "scoring_guide": "Switzerland often runs surpluses. Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by more than 0.5 point · 0 deficit moved by 0.5 point or less · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
             "num": 14,
@@ -887,8 +887,8 @@
             "measure": "Canada Building Permits",
             "category": "Growth / Housing",
             "source_url": "https://www150.statcan.gc.ca/n1/pub/71-607-x/71-607-x2018008-eng.htm",
-            "where_to_find": "Statistics Canada → Building permits → Monthly value in billions of dollars.",
-            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 stable · -1 falling · -2 sharp decline. Canada housing = key economic driver."
+            "where_to_find": "Statistics Canada → Building permits → Monthly value in billions of dollars. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "scoring_guide": "Canada housing = key economic driver. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2 to 10% · 0 within 2% either way · -1 down 2 to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -977,8 +977,8 @@
             "measure": "Canada Fiscal Balance",
             "category": "Fiscal Health",
             "source_url": "https://www.canada.ca/en/department-finance/services/publications/fiscal-monitor.html",
-            "where_to_find": "Finance Canada → Fiscal Monitor → Monthly surplus/deficit figures.",
-            "scoring_guide": "+1 surplus or improving · 0 stable · -1 deficit widening · -2 sharply worsening."
+            "where_to_find": "Finance Canada → Fiscal Monitor → Monthly surplus/deficit figures. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by more than 0.5 point · 0 deficit moved by 0.5 point or less · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
             "num": 14,
@@ -1044,8 +1044,8 @@
             "measure": "Australia Building Approvals",
             "category": "Growth / Housing",
             "source_url": "https://www.abs.gov.au/statistics/industry/building-and-construction/building-approvals-australia",
-            "where_to_find": "ABS Building Approvals → Monthly number of dwellings approved. Note % change vs prior month.",
-            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 stable · -1 falling · -2 sharp decline."
+            "where_to_find": "ABS Building Approvals → Monthly number of dwellings approved. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2 to 10% · 0 within 2% either way · -1 down 2 to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -1134,8 +1134,8 @@
             "measure": "Australia Fiscal Balance",
             "category": "Fiscal Health",
             "source_url": "https://budget.gov.au/",
-            "where_to_find": "Australian Government Budget → Mid-Year Economic & Fiscal Outlook → Underlying cash balance.",
-            "scoring_guide": "+2 surplus · +1 near surplus · 0 small deficit · -1 widening deficit · -2 large worsening deficit."
+            "where_to_find": "Australian Government Budget → Mid-Year Economic & Fiscal Outlook → Underlying cash balance. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by more than 0.5 point · 0 deficit moved by 0.5 point or less · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
             "num": 14,
@@ -1201,8 +1201,8 @@
             "measure": "NZ Building Consents",
             "category": "Growth / Housing",
             "source_url": "https://www.stats.govt.nz/topics/building-consents",
-            "where_to_find": "Stats NZ → Building consents → Monthly number of new dwellings consented. Note % change.",
-            "scoring_guide": "+2 rising strongly · +1 mild rise · 0 stable · -1 falling · -2 sharp decline."
+            "where_to_find": "Stats NZ → Building consents → Monthly number of new dwellings consented. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2 to 10% · 0 within 2% either way · -1 down 2 to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -1291,8 +1291,8 @@
             "measure": "NZ Fiscal Balance",
             "category": "Fiscal Health",
             "source_url": "https://www.treasury.govt.nz/information-and-services/financial-management-and-advice/financial-statements-government",
-            "where_to_find": "Same NZ Treasury page → Core Crown residual cash or OBEGAL (operating balance) figure.",
-            "scoring_guide": "+2 surplus · +1 near surplus · 0 small deficit · -1 widening deficit · -2 sharply worsening."
+            "where_to_find": "Same NZ Treasury page → Core Crown residual cash or OBEGAL (operating balance) figure. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by more than 0.5 point · 0 deficit moved by 0.5 point or less · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
             "num": 14,
