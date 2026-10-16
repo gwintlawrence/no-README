@@ -554,6 +554,15 @@ class WeeklyUpdateUsesTheFacts(unittest.TestCase):
         plain_prompt = self.w.build_prompt("October 18, 2026", ["EUR"])
         self.assertNotIn("already verified", plain_prompt)
 
+    def test_prompt_explains_which_line_is_the_current_value(self):
+        facts = self.w.read_direct_auto_facts(self.sheet)["CAD"]
+        note = "supporting figure for the indicator named before the dash"
+        self.assertIn(note, self.w.build_prompt("October 18, 2026", ["CAD"], known_facts=facts))
+        # USD's prompt is left exactly as it was
+        usd = {"CPI YoY": ("3.7", "Sep 2026", "FRED"), "Building Permits / Housing - % change versus the same "
+               "month a year earlier": ("2.0", "Sep 2026", "FRED")}
+        self.assertNotIn(note, self.w.build_prompt("October 18, 2026", ["USD"], known_facts=usd))
+
     def test_search_budget(self):
         facts = self.w.read_direct_auto_facts(self.sheet)["CAD"]
         self.assertEqual(self.w.search_budget("CAD", facts), 19)          # one indicator covered

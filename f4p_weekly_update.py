@@ -351,9 +351,22 @@ def build_prompt(today: str, currency_batch: list, known_facts: dict = None, spe
             f"already verified, do NOT search for this number, use it exactly as given."
             for name, (value, release_date, source) in known_facts.items()
         )
+        # Figures downloaded straight from the official sources (non-USD) come as a set per indicator: the
+        # figure itself, the earlier figure, and the change the score guide scores. Say which is which, so the
+        # change is not mistaken for the current_value. (USD's one extra figure has always worked as it was,
+        # so the USD prompt is left word for word as it was.)
+        supporting_note = ""
+        if currency_batch != ["USD"] and any(" - " in name for name in known_facts):
+            supporting_note = (
+                "\nA fact whose name continues after a dash is a supporting figure for the indicator named before "
+                "the dash. The row's current_value is the line for the indicator itself (the line with no dash). "
+                "Use the line marked as the earlier value or the year before as the row's prior_value, use the line "
+                "marked as the change to pick the score from that indicator's score guide, and show the figures "
+                "you used in the analysis."
+            )
         known_facts_block = f"""
 IMPORTANT - the current_value for these indicators is already verified below. Do NOT web search to re-find these specific numbers - use them exactly as given, and spend that search budget instead on finding the prior_value, forecast/consensus, and scoring context needed to score and analyze them properly:
-{fact_lines}
+{fact_lines}{supporting_note}
 """
 
     return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) institutional Hub Data pack for the week of {today}.
