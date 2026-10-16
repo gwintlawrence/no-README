@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-16a",
+  "version": "2026-10-16b",
   "about": "Single source of truth for what the F4P Hub collects and how it is scored. The weekly pipeline (f4p_weekly_update.py), the Data Hunt manual prompts and the Data Hunt Compare view all read this file. Change a definition here, run build_prompt_pack.py, and all three agree.",
   "weights_pct": {
     "endogenous": 40,
@@ -496,7 +496,7 @@
             "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/GBR",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for GBR for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for GBR for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
@@ -506,7 +506,7 @@
             "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/GBR",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for GBR for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for GBR for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -526,7 +526,7 @@
             "measure": "BoE Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://www.bankofengland.co.uk/statistics/balance-sheet",
-            "where_to_find": "BoE Balance Sheet statistics → Total assets → read the latest figure and the one from the same date a year earlier.",
+            "where_to_find": "Bank of England → Statistics → Bank of England balance sheet → the consolidated balance sheet data (the downloadable weekly table) → 'Total assets' in £ million, for the latest week and the same week a year earlier. The Weekly Report page lists individual items but no total; if you can only see the items, add up the assets side and say that you did.",
             "scoring_guide": "Shrinking = QT = hawkish. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
@@ -633,7 +633,7 @@
             "measure": "Domestic CGPI excluding energy (electric power, city gas and water, petroleum and coal products), year-on-year %",
             "category": "Pipeline Inflation",
             "source_url": "https://www.boj.or.jp/en/statistics/pi/cgpi/index.htm/",
-            "where_to_find": "BoJ Corporate Goods Price Index (latest release) → Domestic CGPI excluding electric power, gas and water and petroleum and coal products → year-on-year % change. Give the month it covers.",
+            "where_to_find": "BoJ Corporate Goods Price Index (latest release) → Domestic CGPI excluding electric power, gas and water and petroleum and coal products → year-on-year % change. Give the month it covers. The BoJ's monthly release does not always print this line. Use it only if the BoJ shows it. If it does not, write \"data unavailable\", score 0, say so in the analysis, and do not work the figure out yourself from the group table (this row is the one exception to the NO BLANKS RULE).",
             "scoring_guide": "Core CGPI excluding energy is the BoJ's cleaner pipeline signal. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
@@ -653,7 +653,7 @@
             "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/JPN",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for JPN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for JPN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "The very high level is structural, so only the change is scored. Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
@@ -663,7 +663,7 @@
             "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/JPN",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for JPN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for JPN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -683,7 +683,7 @@
             "measure": "BoJ Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://fred.stlouisfed.org/series/JPNASSETS",
-            "where_to_find": "FRED → JPNASSETS (Bank of Japan total assets, monthly) → read the latest value and the value from the same month a year earlier.",
+            "where_to_find": "FRED → JPNASSETS (Bank of Japan total assets, monthly) → read the latest value and the value from the same month a year earlier. Give the amount in trillion yen (FRED shows it in units of 100 million yen, so divide by 10,000).",
             "scoring_guide": "Shrinking = normalization = hawkish; aggressive expansion = JPY bearish. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
@@ -730,7 +730,7 @@
             "measure": "Swiss Building Permits",
             "category": "Growth / Housing",
             "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/construction-housing.html",
-            "where_to_find": "Swiss Federal Statistics → Construction → Building permits latest monthly figure. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "where_to_find": "Swiss Federal Statistics → Construction → Building permits latest monthly figure. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it). The table may be monthly or quarterly: use the latest period it shows and the same period a year earlier, and say which period you used.",
             "scoring_guide": "Swiss housing market is stable — changes matter. Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
@@ -740,7 +740,7 @@
             "measure": "Swiss M2 Money Supply (SNB monetary aggregates)",
             "category": "Monetary Conditions",
             "source_url": "https://data.snb.ch/en/topics/snb/cube/snbmonagg",
-            "where_to_find": "SNB data portal → Monetary aggregates (cube snbmonagg) → M2, latest monthly level and the level for the same month a year earlier. If the portal does not show the year-on-year % change, work it out yourself. The old FRED Swiss M2 series is out of date, so do not use it.",
+            "where_to_find": "SNB data portal → Monetary aggregates (cube snbmonagg) → M2 (not M1 or M3), latest monthly level and the level for the same month a year earlier. If the portal does not show the year-on-year % change, work it out yourself. The old FRED Swiss M2 series is out of date, so do not use it.",
             "scoring_guide": "Score the year-on-year growth of M2: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
@@ -751,7 +751,7 @@
             "category": "Central Bank",
             "source_url": "https://www.snb.ch/en/the-snb/mandates-goals/statistics/statistics-pub/current_interest_exchange_rates",
             "where_to_find": "SNB → 'SNB policy rate' in the interest rate table. Check latest quarterly assessment for direction.",
-            "scoring_guide": "Score the latest SNB quarterly assessment: +2 raised the policy rate · +1 held and signalled that a rise is possible · 0 held and said policy remains appropriate · -1 held and said it is ready to ease or to act in the currency market · -2 cut the rate, or clearly signalled a move to negative rates. Judge the latest meeting only; earlier moves do not count."
+            "scoring_guide": "Score the latest SNB quarterly assessment: +2 raised the policy rate · +1 held and signalled that a rise is possible · 0 held and said policy remains appropriate · -1 held and said it is ready to ease, or said it will step up its action in the currency market · -2 cut the rate, or clearly signalled a move to negative rates. The standing sentence that the SNB is \"willing to be active in the foreign exchange market as necessary\" appears in almost every statement; on its own it does not make the score -1, so a statement that says monetary policy is appropriate and has only that standing sentence scores 0. Judge the latest meeting only; earlier moves do not count."
           },
           {
             "num": 7,
@@ -797,11 +797,11 @@
             "num": 11,
             "id": "employ",
             "hub_name": "Employment",
-            "measure": "Swiss unemployment rate (latest quarter against the previous quarter)",
+            "measure": "Swiss registered unemployment rate, seasonally adjusted (SECO), latest month against the previous month",
             "category": "Labour Market",
-            "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/work-income/employment-working-hours.html",
-            "where_to_find": "Swiss Federal Statistics → Employment → unemployment rate (ILO definition, seasonally adjusted) for the latest quarter and the previous quarter.",
-            "scoring_guide": "Switzerland has one of the lowest unemployment rates globally, so only the change is scored. Score the change in the unemployment rate (latest published rate against the previous published rate, both as shown by the source, to one decimal): +2 fell by 0.2 point or more · +1 fell by 0.1 point · 0 unchanged · -1 rose by 0.1 point · -2 rose by 0.2 point or more. Employment change is context only."
+            "source_url": "https://www.seco.admin.ch/",
+            "where_to_find": "SECO (State Secretariat for Economic Affairs) → Labour market → the monthly press release on the situation on the labour market (published in the first week of each month) → registered unemployment rate, seasonally adjusted, for the latest month and the previous month. This is the registered rate (about 3%), not the ILO rate.",
+            "scoring_guide": "Switzerland has one of the lowest unemployment rates globally, so only the change is scored. Score the change in the seasonally adjusted registered unemployment rate (latest month against the previous month, both as published by SECO, to one decimal): +2 fell by 0.2 point or more · +1 fell by 0.1 point · 0 unchanged · -1 rose by 0.1 point · -2 rose by 0.2 point or more. Employment change is context only."
           },
           {
             "num": 12,
@@ -810,7 +810,7 @@
             "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/CHE",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for CHE for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for CHE for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Debt is very low, so only the change is scored. Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
@@ -820,7 +820,7 @@
             "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/CHE",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for CHE for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for CHE for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Switzerland often runs surpluses. Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -840,7 +840,7 @@
             "measure": "SNB Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://www.snb.ch/en/the-snb/mandates-goals/statistics/statistics-pub/balance_sheet",
-            "where_to_find": "SNB Balance Sheet → Total assets (monthly) → read the latest figure and the one from the same month a year earlier.",
+            "where_to_find": "SNB → Statistics → Balance sheet → the monthly balance sheet (month-end) → 'Total assets', for the latest month-end and the same month-end a year earlier. Give the amount in billions of francs.",
             "scoring_guide": "Growth often reflects FX intervention; the SNB has one of the largest balance sheets relative to GDP. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
@@ -894,10 +894,10 @@
             "num": 5,
             "id": "m2",
             "hub_name": "M2 Money Supply",
-            "measure": "Canada M2 Money Supply",
+            "measure": "Canada M2 (gross), seasonally adjusted (Bank of Canada monetary aggregates)",
             "category": "Monetary Conditions",
-            "source_url": "https://fred.stlouisfed.org/series/MYAGM2CAM189S",
-            "where_to_find": "FRED → Canada M2 series → Annual growth rate. Note if expanding or contracting.",
+            "source_url": "https://www.bankofcanada.ca/rates/banking-and-financial-statistics/selected-monetary-aggregates-and-their-components-formerly-e1/",
+            "where_to_find": "Bank of Canada → Banking and financial statistics → 'Selected monetary aggregates and their components (formerly E1)' → 'M2 (gross)', seasonally adjusted, in millions of dollars, for the latest month and the same month a year earlier; work out the year-on-year % change yourself. The page is updated about 50 days after the month ends, so the latest month is normally two months old. The old FRED Canada M2 series stopped in 2017, so do not use it.",
             "scoring_guide": "Score the year-on-year growth of M2: +2 above 5% · +1 from 2% to 5% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
@@ -947,7 +947,7 @@
             "measure": "Canada IPPI excluding energy and petroleum products, annual % change",
             "category": "Pipeline Inflation",
             "source_url": "https://www150.statcan.gc.ca/n1/en/subjects/prices_and_price_indexes/industrial_product_price_indexes",
-            "where_to_find": "Statistics Canada → Industrial product price index (latest monthly release) → IPPI excluding energy and petroleum products → 12-month % change. Give the month it covers.",
+            "where_to_find": "Statistics Canada → The Daily → the latest 'Industrial product price index' release → Table 1 → row 'IPPI excluding energy and petroleum products' → the 12-month column (the month a year ago to the latest month, % change). Give the month it covers.",
             "scoring_guide": "Core IPPI strips out oil volatility. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
@@ -967,7 +967,7 @@
             "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/CAN",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for CAN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for CAN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
@@ -977,7 +977,7 @@
             "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/CAN",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for CAN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for CAN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -1044,18 +1044,18 @@
             "measure": "Australia Building Approvals",
             "category": "Growth / Housing",
             "source_url": "https://www.abs.gov.au/statistics/industry/building-and-construction/building-approvals-australia",
-            "where_to_find": "ABS Building Approvals → Monthly number of dwellings approved. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "where_to_find": "ABS Building Approvals → Monthly number of dwellings approved. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it). Say whether the figures are seasonally adjusted, trend or original, and use the same type for both months.",
             "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
             "id": "m2",
             "hub_name": "M2 Money Supply",
-            "measure": "Australia M2 Money Supply",
+            "measure": "Australia broad money (RBA table D3)",
             "category": "Monetary Conditions",
-            "source_url": "https://fred.stlouisfed.org/series/MYAGM2AUM189S",
-            "where_to_find": "FRED → Australia M2 series → Annual growth rate.",
-            "scoring_guide": "Score the year-on-year growth of M2: +2 above 6% · +1 from 2% to 6% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
+            "source_url": "https://www.rba.gov.au/statistics/tables/",
+            "where_to_find": "Reserve Bank of Australia → Statistics → Statistical tables → D3 Monetary Aggregates → 'Broad money' (the RBA does not publish an M2), latest month and the same month a year earlier; work out the year-on-year % change yourself if the table does not show it. The old FRED Australia M2 series is out of date, so do not use it.",
+            "scoring_guide": "Score the year-on-year growth of broad money: +2 above 6% · +1 from 2% to 6% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 6,
@@ -1104,7 +1104,7 @@
             "measure": "Australia PPI, output of the manufacturing industries, annual % change",
             "category": "Pipeline Inflation",
             "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/producer-price-indexes-australia",
-            "where_to_find": "ABS Producer Price Indexes (latest quarterly release) → Output of the manufacturing industries → annual % change. Give the quarter it covers.",
+            "where_to_find": "Australian Bureau of Statistics → Producer Price Indexes, Australia (latest quarterly release) → the key statistic 'Output of the Manufacturing industries' annual % change, or Table 12 (Output of the Manufacturing industries) → percentage change from the same quarter a year earlier. Give the quarter it covers.",
             "scoring_guide": "Core pipeline pressure outside the commodity swings. Quarterly release: use the latest quarter. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
@@ -1124,7 +1124,7 @@
             "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/AUS",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for AUS for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for AUS for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
@@ -1134,7 +1134,7 @@
             "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/AUS",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for AUS for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for AUS for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -1153,8 +1153,8 @@
             "hub_name": "Central Bank Balance Sheet / GDP",
             "measure": "RBA Balance Sheet / GDP",
             "category": "Central Bank",
-            "source_url": "https://www.rba.gov.au/statistics/frequency/balance-sheet.html",
-            "where_to_find": "RBA Balance Sheet → Total assets → read the latest figure and the one from the same date a year earlier.",
+            "source_url": "https://www.rba.gov.au/statistics/tables/",
+            "where_to_find": "Reserve Bank of Australia → Statistics → Statistical tables → A1 Reserve Bank of Australia - Balance Sheet → 'Total assets', for the latest week or month and the same date a year earlier.",
             "scoring_guide": "Shrinking = post-QE normalisation. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
@@ -1201,7 +1201,7 @@
             "measure": "NZ Building Consents",
             "category": "Growth / Housing",
             "source_url": "https://www.stats.govt.nz/topics/building-consents",
-            "where_to_find": "Stats NZ → Building consents → Monthly number of new dwellings consented. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
+            "where_to_find": "Stats NZ → Building consents (latest monthly release) → the actual (not seasonally adjusted) number of new dwellings consented in the latest month, and in the same month a year earlier. Use the monthly number, not the 12-month total, and work out the % change yourself if the page does not show it.",
             "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
@@ -1261,7 +1261,7 @@
             "measure": "NZ PPI outputs, manufacturing industries, annual % change",
             "category": "Pipeline Inflation",
             "source_url": "https://www.stats.govt.nz/topics/producer-price-indexes",
-            "where_to_find": "Stats NZ Producer price index (latest quarterly release) → Outputs for the manufacturing industries → annual % change. Give the quarter it covers.",
+            "where_to_find": "Stats NZ → Producers price index (latest quarterly release) → Outputs → manufacturing industries → percentage change from the same quarter a year earlier. If the release page does not show it, use the Stats NZ Infoshare series for the producers price index outputs of the manufacturing industries and work out the annual change from the index (latest quarter against the same quarter a year earlier). Give the quarter it covers.",
             "scoring_guide": "Core pipeline pressure in the domestic economy. Quarterly release: use the latest quarter. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
@@ -1281,7 +1281,7 @@
             "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/NZL",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for NZL for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for NZL for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
@@ -1291,7 +1291,7 @@
             "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
             "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/NZL",
-            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for NZL for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for NZL for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts (for a reading taken in 2026 that means 2025 against 2024, never 2026). Use these DataMapper figures, not the IMF country report (Article IV), which can carry an older or different edition. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -1452,6 +1452,7 @@
     "Volatility (10% weight) is not collected by the weekly pipeline; it is still entered by hand.",
     "ISM Manufacturing and Services PMI for the USD are typed in by hand each month (ism_fetcher.py); no free API.",
     "The Exogenous layer in the pipeline is four structural facts (GDP, current account, policy rate, stock index). Older manual materials list oil, copper, China PMI, VIX, DXY and geopolitics. Decide which is the standard.",
-    "Government debt and fiscal balance for GBP, JPY, CHF, CAD, AUD and NZD come from the IMF World Economic Outlook, which is updated in April and October; the latest full year is an estimate and can be revised."
+    "Government debt and fiscal balance for GBP, JPY, CHF, CAD, AUD and NZD come from the IMF World Economic Outlook, which is updated in April and October; the latest full year is an estimate and can be revised.",
+    "Japan Core PPI (row 10): the Bank of Japan's monthly CGPI release has no ex-energy line, so this row scores 0 ('data unavailable') unless the BoJ prints one (decided 16 Oct 2026)."
   ]
 }

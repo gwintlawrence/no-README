@@ -73,6 +73,12 @@ def indicator_definitions_block(spec, currencies):
         "\"from 2% to 3%\" and \"from 3% to 4%\" and the reading is 3.0%), use the milder score, the one closer "
         "to 0. Use the figure exactly as the source publishes it; do not round it or recalculate it unless the "
         "guide asks you to.",
+        "CALCULATION RULE - when a guide needs a change or a rate that the source does not print, work it out "
+        "yourself from the two published figures as (latest - earlier) / earlier x 100, and show both figures, "
+        "both dates and the result to one decimal. Do not take a rate from a news article instead of the source.",
+        "SCORE CHECK - after you choose each score, read that indicator's score guide again and check that the "
+        "figure you reported sits inside the band you chose. If it does not, correct the score before you answer. "
+        "The score comes from the guide's bands, not from the tone of the news.",
     ]
     for code in currencies:
         lines.append(f"{code} ({table[code].get('name', code)}):")
