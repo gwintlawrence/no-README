@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-15f",
+  "version": "2026-10-15g",
   "about": "Single source of truth for what the F4P Hub collects and how it is scored. The weekly pipeline (f4p_weekly_update.py), the Data Hunt manual prompts and the Data Hunt Compare view all read this file. Change a definition here, run build_prompt_pack.py, and all three agree.",
   "weights_pct": {
     "endogenous": 40,
@@ -79,7 +79,7 @@
             "category": "Growth / Housing",
             "source_url": "https://fred.stlouisfed.org/series/PERMIT",
             "where_to_find": "FRED → PERMIT series → read the latest value (thousands of units, seasonally adjusted annual rate) and the value for the same month a year earlier; both are on the chart.",
-            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%.",
+            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%.",
             "hub_series": {
               "series": "PERMIT",
               "calc": "latest value (thousands, seasonally adjusted annual rate)"
@@ -212,8 +212,8 @@
             "measure": "CB Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://fred.stlouisfed.org/series/WALCL",
-            "where_to_find": "FRED → WALCL → Shows Fed total assets (balance sheet). Compare to prior periods — is it expanding (QE) or shrinking (QT)?",
-            "scoring_guide": "+2 shrinking quickly (QT = hawkish) · +1 shrinking slowly · 0 flat or holding steady · -1 expanding slowly · -2 expanding fast (aggressive QE = currency dilution)."
+            "where_to_find": "FRED → WALCL (weekly, millions of dollars) → read the latest value and the value from the same week a year earlier; both are on the chart.",
+            "scoring_guide": "Shrinking = QT = hawkish; aggressive expansion = currency dilution. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
       },
@@ -260,7 +260,7 @@
             "category": "Growth / Housing",
             "source_url": "https://www.destatis.de/EN/Themes/Economy/Construction/Tables/building-permits.html",
             "where_to_find": "Destatis (German Statistics) → Building permits table → Find the latest monthly figure and the same month a year earlier (calculate the % change yourself if the page does not show it).",
-            "scoring_guide": "German permits proxy for EZ construction health. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
+            "scoring_guide": "German permits proxy for EZ construction health. Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -368,9 +368,9 @@
             "hub_name": "Central Bank Balance Sheet / GDP",
             "measure": "ECB Balance Sheet / GDP",
             "category": "Central Bank",
-            "source_url": "https://www.ecb.europa.eu/pub/annual/balance/html/index.en.html",
-            "where_to_find": "ECB annual balance sheet data. Check if assets are expanding (QE) or shrinking (QT) as trend.",
-            "scoring_guide": "+2 shrinking quickly (QT/hawkish) · +1 shrinking slowly · 0 flat or holding steady · -1 expanding slowly · -2 expanding fast (aggressive QE = EUR dilution)."
+            "source_url": "https://www.ecb.europa.eu/press/annual-reports-financial-statements/wfs/html/index.en.html",
+            "where_to_find": "ECB → Weekly financial statements (consolidated financial statement of the Eurosystem, published weekly) → Total assets for the latest week and for the same week a year earlier.",
+            "scoring_guide": "Shrinking = QT = hawkish. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
       },
@@ -417,7 +417,7 @@
             "category": "Growth / Housing",
             "source_url": "https://www.bankofengland.co.uk/statistics/mortgage-lender-and-administrator-statistics",
             "where_to_find": "BoE Statistics → Mortgage approvals for house purchase. Monthly figure in thousands. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
-            "scoring_guide": "Rising approvals = housing market recovery = confidence. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
+            "scoring_guide": "Rising approvals = housing market recovery = confidence. Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -526,8 +526,8 @@
             "measure": "BoE Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://www.bankofengland.co.uk/statistics/balance-sheet",
-            "where_to_find": "BoE Balance Sheet statistics → Total assets value. Compare trend — expanding (QE) or shrinking (QT)?",
-            "scoring_guide": "+2 shrinking quickly (QT = hawkish) · +1 shrinking slowly · 0 flat or holding steady · -1 expanding slowly · -2 expanding fast (aggressive QE)."
+            "where_to_find": "BoE Balance Sheet statistics → Total assets → read the latest figure and the one from the same date a year earlier.",
+            "scoring_guide": "Shrinking = QT = hawkish. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
       },
@@ -574,7 +574,7 @@
             "category": "Growth / Housing",
             "source_url": "https://www.mlit.go.jp/en/statistics/",
             "where_to_find": "Japan Ministry of Land Infrastructure → Housing starts / permits data. Monthly figure in thousands. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
-            "scoring_guide": "Leads GDP by several months. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
+            "scoring_guide": "Leads GDP by several months. Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -683,8 +683,8 @@
             "measure": "BoJ Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://fred.stlouisfed.org/series/JPNASSETS",
-            "where_to_find": "FRED → Japan central bank assets → Is BoJ balance sheet expanding (QE/YCC) or shrinking (normalization)?",
-            "scoring_guide": "+2 shrinking quickly (normalization/hawkish) · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly · -2 expanding fast (aggressive expansion = JPY bearish)."
+            "where_to_find": "FRED → JPNASSETS (Bank of Japan total assets, monthly) → read the latest value and the value from the same month a year earlier.",
+            "scoring_guide": "Shrinking = normalization = hawkish; aggressive expansion = JPY bearish. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
       },
@@ -731,7 +731,7 @@
             "category": "Growth / Housing",
             "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/construction-housing.html",
             "where_to_find": "Swiss Federal Statistics → Construction → Building permits latest monthly figure. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
-            "scoring_guide": "Swiss housing market is stable — changes matter. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
+            "scoring_guide": "Swiss housing market is stable — changes matter. Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -840,8 +840,8 @@
             "measure": "SNB Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://www.snb.ch/en/the-snb/mandates-goals/statistics/statistics-pub/balance_sheet",
-            "where_to_find": "SNB Balance Sheet → Total assets. SNB has one of the largest balance sheets relative to GDP globally.",
-            "scoring_guide": "+2 shrinking quickly · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly (FX intervention) · -2 expanding fast (large expansion = CHF dilution)."
+            "where_to_find": "SNB Balance Sheet → Total assets (monthly) → read the latest figure and the one from the same month a year earlier.",
+            "scoring_guide": "Growth often reflects FX intervention; the SNB has one of the largest balance sheets relative to GDP. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
       },
@@ -888,7 +888,7 @@
             "category": "Growth / Housing",
             "source_url": "https://www150.statcan.gc.ca/n1/pub/71-607-x/71-607-x2018008-eng.htm",
             "where_to_find": "Statistics Canada → Building permits → Monthly value in billions of dollars. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
-            "scoring_guide": "Canada housing = key economic driver. Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
+            "scoring_guide": "Canada housing = key economic driver. Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -997,8 +997,8 @@
             "measure": "BoC Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://www.bankofcanada.ca/rates/banking-and-financial-statistics/bank-of-canada-assets-and-liabilities-weekly-wednesday/",
-            "where_to_find": "BoC weekly balance sheet → Total assets. Note if shrinking (QT) or growing (QE).",
-            "scoring_guide": "+2 shrinking quickly (QT) · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly · -2 expanding fast (aggressive expansion)."
+            "where_to_find": "BoC weekly balance sheet → Total assets → read the latest figure and the one from the same week a year earlier.",
+            "scoring_guide": "Shrinking = QT. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
       },
@@ -1045,7 +1045,7 @@
             "category": "Growth / Housing",
             "source_url": "https://www.abs.gov.au/statistics/industry/building-and-construction/building-approvals-australia",
             "where_to_find": "ABS Building Approvals → Monthly number of dwellings approved. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
-            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
+            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -1154,8 +1154,8 @@
             "measure": "RBA Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://www.rba.gov.au/statistics/frequency/balance-sheet.html",
-            "where_to_find": "RBA Balance Sheet → Total assets. Note if shrinking (post-QE normalisation) or stable.",
-            "scoring_guide": "+2 shrinking quickly (normalising) · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly · -2 expanding fast (aggressive expansion)."
+            "where_to_find": "RBA Balance Sheet → Total assets → read the latest figure and the one from the same date a year earlier.",
+            "scoring_guide": "Shrinking = post-QE normalisation. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
       },
@@ -1202,7 +1202,7 @@
             "category": "Growth / Housing",
             "source_url": "https://www.stats.govt.nz/topics/building-consents",
             "where_to_find": "Stats NZ → Building consents → Monthly number of new dwellings consented. Also find the same month a year earlier, so the change over the year can be worked out (calculate the % change yourself if the page does not show it).",
-            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier): +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
+            "scoring_guide": "Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
             "num": 5,
@@ -1311,8 +1311,8 @@
             "measure": "RBNZ Balance Sheet / GDP",
             "category": "Central Bank",
             "source_url": "https://www.rbnz.govt.nz/statistics/series/reserve-bank-balance-sheet",
-            "where_to_find": "RBNZ Balance Sheet → Total assets. Note trend — shrinking post-QE or stable.",
-            "scoring_guide": "+2 shrinking quickly (normalising) · +1 shrinking slowly · 0 flat or holding steady · -1 growing slowly · -2 expanding fast (aggressive expansion)."
+            "where_to_find": "RBNZ Balance Sheet → Total assets → read the latest figure and the one from the same date a year earlier.",
+            "scoring_guide": "Shrinking = post-QE normalisation. Score the change in total assets (the ratio to GDP is not needed) over the last year, latest weekly or monthly figure against the same date a year earlier: +2 down more than 10% · +1 down 2% to 10% · 0 moved by less than 2% either way · -1 up 2% to 10% · -2 up more than 10%."
           }
         ]
       }

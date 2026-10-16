@@ -143,6 +143,12 @@ FRED_AUTO_INDICATOR_MAP = {
     "Core PPI": "Core PPI YoY %",
     "Central Bank Rate & Current Policy Stance": "Federal Funds Rate %",
 }
+# Extra verified figures handed to the AI beside the ones above (name shown to the AI -> FRED AUTO label).
+# The Building Permits guide scores the change against the same month a year earlier, so the AI is given
+# that change too, instead of only the latest level.
+FRED_AUTO_EXTRA_FACTS = {
+    "Building Permits / Housing - % change versus the same month a year earlier (this is the figure the score guide scores)": "Building Permits YoY %",
+}
 
 
 def extract_json_object(text: str) -> str:
@@ -287,11 +293,11 @@ def read_fred_auto_facts(spreadsheet) -> dict:
             by_fred_label[indicator.strip()] = (value.strip(), release_date.strip(), source.strip())
 
     facts = {}
-    for our_name, fred_label in FRED_AUTO_INDICATOR_MAP.items():
+    for our_name, fred_label in list(FRED_AUTO_INDICATOR_MAP.items()) + list(FRED_AUTO_EXTRA_FACTS.items()):
         if fred_label in by_fred_label:
             facts[our_name] = by_fred_label[fred_label]
 
-    print(f"[F4P Weekly Update] FRED AUTO supplied {len(facts)}/{len(FRED_AUTO_INDICATOR_MAP)} "
+    print(f"[F4P Weekly Update] FRED AUTO supplied {len(facts)}/{len(FRED_AUTO_INDICATOR_MAP) + len(FRED_AUTO_EXTRA_FACTS)} "
           f"pre-verified USD figures (saves searching for those specific numbers).")
     return facts
 

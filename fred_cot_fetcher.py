@@ -27,6 +27,10 @@ FRED_SERIES = [
     ('PERMIT',          'latest', 'Building Permits (000s)',      11),
     ('UMCSENT',         'latest', 'Michigan Consumer Sentiment', 12),
     ('A191RL1Q225SBEA', 'latest', 'GDP Growth Rate %',           13),
+    # Same series as row 11, but as the change against the same month a year earlier. The Building Permits
+    # score guide scores that change, and without it the weekly run only had this month's level to go on
+    # and sometimes scored the month-over-month dip instead (15 Oct 2026: +1 by hand, -1 from the Hub).
+    ('PERMIT',          'yoy',    'Building Permits YoY %',       14),
 ]
 
 # Source lineage (Hub enhancement #1): the publishing agency behind each FRED
@@ -246,14 +250,14 @@ def write_to_sheet(service, fred_results, cot_results, is_friday, fred_meta=None
     # FRED rows
     rows = []
     for i, (series_id, calc, label, sheet_row) in enumerate(FRED_SERIES):
-        val, date = fred_results.get(series_id, (None, None))
+        val, date = fred_results.get(label, (None, None))
         status = 'OK' if val is not None else 'FETCH FAILED - enter manually'
         display_val = str(val) if val is not None else 'N/A'
         rows.append([i + 1, label, display_val, date or '', 'FRED:' + series_id, status])
 
     service.spreadsheets().values().update(
         spreadsheetId=SPREADSHEET_ID,
-        range=TAB_NAME + '!A4:F13',
+        range=TAB_NAME + '!A4:F14',
         valueInputOption='RAW',
         body={'values': rows}
     ).execute()
@@ -276,11 +280,11 @@ def write_to_sheet(service, fred_results, cot_results, is_friday, fred_meta=None
         lineage_rows.append([
             FRED_SOURCE_AGENCY.get(series_id, ''),
             meta.get('last_updated', ''),
-            timestamp if fred_results.get(series_id, (None, None))[0] is not None else '',
+            timestamp if fred_results.get(label, (None, None))[0] is not None else '',
         ])
     service.spreadsheets().values().update(
         spreadsheetId=SPREADSHEET_ID,
-        range=TAB_NAME + '!G4:I13',
+        range=TAB_NAME + '!G4:I14',
         valueInputOption='RAW',
         body={'values': lineage_rows}
     ).execute()
@@ -379,14 +383,15 @@ def main():
         print('Fetching FRED: ' + series_id + ' (' + calc + ')...')
         try:
             val, date = get_fred_value(series_id, calc)
-            fred_results[series_id] = (val, date)
+            fred_results[label] = (val, date)
             print('  -> ' + str(val) + ' (' + str(date) + ')')
         except Exception as e:
             print('  -> FAILED: ' + str(e))
-            fred_results[series_id] = (None, None)
+            fred_results[label] = (None, None)
         time.sleep(1)
-        fred_meta[series_id] = get_fred_meta(series_id)
-        time.sleep(1)
+        if series_id not in fred_meta:  # PERMIT appears twice (level and year-over-year); one lookup is enough
+            fred_meta[series_id] = get_fred_meta(series_id)
+            time.sleep(1)
 
     cot_results = {}
     if is_friday:
