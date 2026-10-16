@@ -78,5 +78,41 @@ class PpiSeriesMatchTheDefinitions(unittest.TestCase):
         self.assertEqual(set(fetcher.FRED_SOURCE_AGENCY), {row[0] for row in fetcher.FRED_SERIES})
 
 
+class PermitsYearOverYear(unittest.TestCase):
+    """The Building Permits guide scores the change over a year, so the weekly run is handed that figure too."""
+
+    def test_the_fetcher_has_both_permit_rows_in_order(self):
+        rows = [r for r in fetcher.FRED_SERIES if r[0] == 'PERMIT']
+        self.assertEqual([(r[1], r[2]) for r in rows],
+                         [('latest', 'Building Permits (000s)'), ('yoy', 'Building Permits YoY %')])
+        self.assertEqual(fetcher.FRED_SERIES[-1][2], 'Building Permits YoY %')   # row 14: nothing already on the sheet moves
+        self.assertEqual(len({r[2] for r in fetcher.FRED_SERIES}), len(fetcher.FRED_SERIES))  # results are keyed by label
+
+    def test_permits_year_over_year_uses_the_same_month_a_year_earlier(self):
+        obs = [{'date': '2026-08-01', 'value': '1403'}, {'date': '2026-07-01', 'value': '1433'},
+               {'date': '2025-08-01', 'value': '1347'}]
+        self.assertEqual(fetcher.calculate_from_observations(obs, 'yoy'), (4.16, '2026-08-01'))   # not the 2.1% fall from July
+
+    def test_the_weekly_run_is_handed_the_year_over_year_figure(self):
+        import f4p_weekly_update as w
+
+        class WS:
+            def get_all_values(self):
+                return [['1', 'Building Permits (000s)', '1403', '2026-08-01', 'FRED:PERMIT', 'OK'],
+                        ['11', 'Building Permits YoY %', '4.16', '2026-08-01', 'FRED:PERMIT', 'OK']]
+
+        class SS:
+            def worksheet(self, name):
+                return WS()
+
+        facts = w.read_fred_auto_facts(SS())
+        self.assertEqual(facts['Building Permits / Housing'][0], '1403')
+        extra = [k for k in facts if k.startswith('Building Permits / Housing - %')]
+        self.assertEqual([facts[k][0] for k in extra], ['4.16'])
+        prompt = w.build_prompt('{{DATE}}', ['USD'], known_facts=facts)
+        self.assertIn('a year earlier', prompt)
+        self.assertIn('current_value = "4.16"', prompt)
+
+
 if __name__ == '__main__':
     unittest.main()
