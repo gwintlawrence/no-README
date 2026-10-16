@@ -40,6 +40,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 from f4p_spec import load_spec, indicator_definitions_block
+from direct_fetchers import DIRECT_AUTO_TAB_NAME, MAX_FACT_AGE_DAYS, facts_from_rows
 
 
 CURRENCIES = ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"]
@@ -300,6 +301,39 @@ def read_fred_auto_facts(spreadsheet) -> dict:
     print(f"[F4P Weekly Update] FRED AUTO supplied {len(facts)}/{len(FRED_AUTO_INDICATOR_MAP) + len(FRED_AUTO_EXTRA_FACTS)} "
           f"pre-verified USD figures (saves searching for those specific numbers).")
     return facts
+
+
+def read_direct_auto_facts(spreadsheet, now=None) -> dict:
+    """
+    Batch 2. Reads the DIRECT AUTO tab - written daily by fred_cot_fetcher.py, which downloads 10-year yields,
+    IMF debt and deficit figures and similar straight from the official sources - and returns
+    {currency: {fact name: (value, as_of, source)}} for the seven non-USD currencies.
+
+    Like the FRED AUTO read above, this is a pure optimisation: any problem (tab missing, bad row, a figure
+    retrieved more than MAX_FACT_AGE_DAYS ago) just means the AI searches for that figure itself, the way it
+    did before. It must never be allowed to fail the actual run.
+    """
+    try:
+        rows = spreadsheet.worksheet(DIRECT_AUTO_TAB_NAME).get_all_values()
+        facts = facts_from_rows(rows, now or datetime.utcnow(), MAX_FACT_AGE_DAYS)
+    except Exception as exc:
+        print(f"[F4P Weekly Update] Could not read '{DIRECT_AUTO_TAB_NAME}' tab ({exc}) - "
+              f"the non-USD batches will search for every figure as normal.")
+        return {}
+    summary = ", ".join(f"{ccy} {len(f)}" for ccy, f in facts.items()) or "none"
+    print(f"[F4P Weekly Update] DIRECT AUTO supplied verified figures (fresh rows only): {summary}.")
+    return facts
+
+
+def search_budget(currency: str, known_facts: dict) -> int:
+    """Web searches the AI may use for one currency. Every indicator whose figure is already verified is one
+    the AI does not have to hunt for, so it needs fewer searches. USD keeps its existing budget of 12."""
+    if not known_facts:
+        return 20
+    if currency == "USD":
+        return 12
+    indicators_covered = len({name.split(" - ")[0] for name in known_facts})
+    return max(12, 20 - indicators_covered)
 
 
 def build_prompt(today: str, currency_batch: list, known_facts: dict = None, spec: dict = None) -> str:
@@ -849,17 +883,23 @@ def run_hub_data(spreadsheet, today: str) -> list:
     batch_size = 1  # 1 currency per call (15 indicators) - most reliable, avoids pause_turn loops
 
     fred_facts = read_fred_auto_facts(spreadsheet)
+    direct_facts = read_direct_auto_facts(spreadsheet)
 
     for batch_num, batch in enumerate(chunk(CURRENCIES, batch_size), start=1):
         print(f"[F4P Weekly Update] Batch {batch_num}: {batch}")
-        known_facts = fred_facts if batch == ["USD"] else None
+        # USD: verified FRED figures. The other seven: figures downloaded straight from the official sources
+        # (DIRECT AUTO tab). Facts are per currency, so this only applies while each batch is one currency.
+        if batch == ["USD"]:
+            known_facts = fred_facts
+        elif len(batch) == 1:
+            known_facts = direct_facts.get(batch[0]) or None
+        else:
+            known_facts = None
         prompt = build_prompt(today, batch, known_facts=known_facts)
 
         try:
-            # USD gets a tighter search budget - up to 7 of its 15 indicators
-            # may already have a verified current_value, so it needs less
-            # searching than the other 7 currencies.
-            data = call_claude(prompt, max_uses=12 if known_facts else 20)
+            # A currency with verified figures needs fewer searches (see search_budget).
+            data = call_claude(prompt, max_uses=search_budget(batch[0], known_facts))
         except Exception as exc:
             print(f"[F4P Weekly Update] Batch {batch_num} ({batch}) FAILED: {exc}")
             print("[F4P Weekly Update] Continuing with remaining batches...")
