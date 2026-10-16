@@ -259,7 +259,7 @@
             "measure": "Building Permits (Germany)",
             "category": "Growth / Housing",
             "source_url": "https://www.destatis.de/EN/Themes/Economy/Construction/Tables/building-permits.html",
-            "where_to_find": "Destatis (German Statistics) → Building permits table → Find the latest monthly figure and the same month a year earlier (calculate the % change yourself if the page does not show it).",
+            "where_to_find": "Destatis (German Statistics) → Building permits table → Find the latest monthly figure and the same month a year earlier (calculate the % change yourself if the page does not show it). Use the single latest month, not a half-year or year-to-date total (for example January to June), and the same single month a year earlier.",
             "scoring_guide": "German permits proxy for EZ construction health. Score the change over the last year (latest month against the same month a year earlier), not the change from last month: +2 up more than 10% · +1 up 2% to 10% · 0 moved by less than 2% either way · -1 down 2% to 10% · -2 down more than 10%."
           },
           {
@@ -326,11 +326,11 @@
             "num": 11,
             "id": "employ",
             "hub_name": "Employment",
-            "measure": "Employment / Unemployment (EZ)",
+            "measure": "Euro area unemployment rate, seasonally adjusted (Eurostat), latest month against the previous month",
             "category": "Labour Market",
             "source_url": "https://ec.europa.eu/eurostat/web/labour-market",
-            "where_to_find": "Eurostat Labour Market → Latest 'Euro area unemployment rate' monthly figure.",
-            "scoring_guide": "Lower unemployment = stronger economy. +2 falling sharply · +1 falling · 0 stable · -1 rising · -2 rising sharply."
+            "where_to_find": "Eurostat → Labour market → 'Euro area unemployment rate', seasonally adjusted, for the latest month and the previous month (the monthly Euro indicators news release on unemployment, published early each month).",
+            "scoring_guide": "Lower unemployment = stronger economy. Score the change in the unemployment rate (latest published rate against the previous month's published rate, both as shown by Eurostat, to one decimal): +2 fell by 0.2 point or more · +1 fell by 0.1 point · 0 unchanged · -1 rose by 0.1 point · -2 rose by 0.2 point or more. Do not compare with a year earlier; employment change is context only."
           },
           {
             "num": 12,
