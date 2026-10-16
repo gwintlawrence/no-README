@@ -57,6 +57,22 @@ def indicator_definitions_block(spec, currencies):
         "FRESHNESS RULE - if the page you read shows a daily or weekly figure (a yield, a rate, a central-bank "
         "balance sheet) that is more than 7 days old, look for the newer value of that same series on the "
         "central bank's own site or the source's data page, and always give the date of the value you use.",
+        "RECENT RELEASE RULE - before you settle on a figure, check whether the publisher has put out a newer "
+        "release in the last two days (for example today's or yesterday's data release or policy decision). If "
+        "it has, use the newer release instead of the older one and give its release date.",
+        "NO BLANKS RULE - \"data unavailable\" is the last resort, not the first. If the named page cannot be read "
+        "or does not show the figure, open the same series on the publisher's own data page, statistical tables "
+        "or latest press release, use the latest figure that shows it with its date, and say which page you "
+        "used. Write \"data unavailable\" (score 0) only when no official page shows it, and say in the analysis "
+        "what you tried.",
+        "YEAR-ON-YEAR RULE - where a measure or score guide says year-on-year, annual or \"over the last year\", "
+        "compare the latest period with the same period one year earlier (same month, quarter or date) and give "
+        "both figures and both dates. Do not use the change from the previous month or quarter.",
+        "BOUNDARY RULE - in a score guide, \"above\" and \"below\" are strict (a reading equal to the number is "
+        "neither above nor below it). If a reading sits exactly on a number shared by two bands (for example "
+        "\"from 2% to 3%\" and \"from 3% to 4%\" and the reading is 3.0%), use the milder score, the one closer "
+        "to 0. Use the figure exactly as the source publishes it; do not round it or recalculate it unless the "
+        "guide asks you to.",
     ]
     for code in currencies:
         lines.append(f"{code} ({table[code].get('name', code)}):")
