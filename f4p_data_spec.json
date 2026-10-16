@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-15g",
+  "version": "2026-10-16a",
   "about": "Single source of truth for what the F4P Hub collects and how it is scored. The weekly pipeline (f4p_weekly_update.py), the Data Hunt manual prompts and the Data Hunt Compare view all read this file. Change a definition here, run build_prompt_pack.py, and all three agree.",
   "weights_pct": {
     "endogenous": 40,
@@ -387,7 +387,7 @@
             "category": "Growth / Production",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "S&P Global PMI → Filter 'United Kingdom Manufacturing' → PMI headline figure in latest release.",
-            "scoring_guide": "UK manufacturing is smaller than services but signals export health. Same +2/+1/0/-1/-2 vs 50 threshold."
+            "scoring_guide": "UK manufacturing is smaller than services but signals export health. Score the headline PMI reading: +2 above 52 · +1 from 50.5 to 52 · 0 from 49.5 to 50.5 · -1 from 47 to 49.5 · -2 below 47."
           },
           {
             "num": 2,
@@ -397,7 +397,7 @@
             "category": "Growth / Demand",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "Same S&P Global site → Filter 'UK Services' → PMI headline figure.",
-            "scoring_guide": "MOST important PMI for GBP. UK is 80% services economy. +2 above 55 · +1 above 52 · 0 near 50 · -1 below 50 · -2 below 47."
+            "scoring_guide": "MOST important PMI for GBP. UK is 80% services economy. Score the headline PMI reading: +2 above 55 · +1 from 52 to 55 · 0 from 50 to 52 · -1 from 47 to 50 · -2 below 47."
           },
           {
             "num": 3,
@@ -427,7 +427,7 @@
             "category": "Monetary Conditions",
             "source_url": "https://www.bankofengland.co.uk/statistics/money-and-credit",
             "where_to_find": "BoE Money & Credit page → M4 annual growth rate in the latest release.",
-            "scoring_guide": "M4 is BoE's preferred broad money measure. +2 growing >6% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+            "scoring_guide": "M4 is BoE's preferred broad money measure. Score the year-on-year growth of M4: +2 above 6% · +1 from 2% to 6% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 6,
@@ -437,7 +437,7 @@
             "category": "Central Bank",
             "source_url": "https://www.bankofengland.co.uk/monetary-policy/the-interest-rate-bank-charges-banks",
             "where_to_find": "BoE page → Current Bank Rate shown in large bold text. Check latest MPC vote split for direction.",
-            "scoring_guide": "+2 hiking or hawkish hold with vote to hike · +1 hold hawkish lean · 0 neutral · -1 dovish lean · -2 cutting cycle."
+            "scoring_guide": "Score the latest MPC decision and vote: +2 raised Bank Rate, or held while at least one MPC member voted to raise · +1 held with everyone voting to hold and the minutes or guidance leaning hawkish (rates may need to stay high or rise) · 0 held with a balanced message · -1 held with the message leaning dovish (cuts likely) or at least one member voting to cut · -2 cut Bank Rate. Judge the latest meeting only; earlier moves do not count."
           },
           {
             "num": 7,
@@ -447,7 +447,7 @@
             "category": "Inflation",
             "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices",
             "where_to_find": "ONS → Consumer price inflation → '12-month CPI rate' highlighted % box in the latest release.",
-            "scoring_guide": "BoE targets 2%. +2 above 3.5% · +1 above 2.5% · 0 near 2% · -1 below 1.5% · -2 below 1%."
+            "scoring_guide": "BoE targets 2%. Score the headline annual rate: +2 above 3.5% · +1 from 2.5% to 3.5% · 0 from 1.5% to 2.5% · -1 from 1% to 1.5% · -2 below 1%."
           },
           {
             "num": 8,
@@ -457,7 +457,7 @@
             "category": "Underlying Inflation",
             "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices",
             "where_to_find": "Same ONS CPI release → Find 'CPI excluding energy, food, alcohol & tobacco' — this is Core CPI.",
-            "scoring_guide": "BoE watches Services CPI closely. Sticky above 4% = hawkish BoE = GBP positive."
+            "scoring_guide": "BoE watches services and core inflation closely; sticky core is hawkish and GBP positive. Score the annual rate with the same bands as headline CPI: +2 above 3.5% · +1 from 2.5% to 3.5% · 0 from 1.5% to 2.5% · -1 from 1% to 1.5% · -2 below 1%."
           },
           {
             "num": 9,
@@ -467,46 +467,46 @@
             "category": "Pipeline Inflation",
             "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices/bulletins/producerpriceinflation/latest",
             "where_to_find": "ONS PPI bulletin → 'Output PPI' annual % change in the headline figure.",
-            "scoring_guide": "Rising output PPI = cost pressures passing through. +2 above 4% · +1 above 2% · 0 flat · -1 falling · -2 deflation."
+            "scoring_guide": "Rising output PPI = cost pressures passing through. Score the annual rate: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 10,
             "id": "coreppi",
             "hub_name": "Core PPI",
-            "measure": "UK Core PPI YoY",
+            "measure": "Core output PPI (output prices excluding food, beverages, tobacco and petroleum), annual % change",
             "category": "Pipeline Inflation",
             "source_url": "https://www.ons.gov.uk/economy/inflationandpriceindices/bulletins/producerpriceinflation/latest",
-            "where_to_find": "Same ONS PPI bulletin → Look for 'excluding food, beverages, tobacco and petroleum' — Core Output PPI.",
-            "scoring_guide": "Strips out energy and food. Most reliable signal of underlying cost pressure. Same scoring as headline PPI."
+            "where_to_find": "ONS Producer price inflation bulletin (latest) → 'Core output' annual rate: output prices excluding food, beverages, tobacco and petroleum. Give the month it covers.",
+            "scoring_guide": "Strips out energy and food, so it is the most reliable signal of underlying cost pressure. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 11,
             "id": "employ",
             "hub_name": "Employment",
-            "measure": "UK Employment / Labour Market",
+            "measure": "UK unemployment rate (latest three months against the previous three months)",
             "category": "Labour Market",
             "source_url": "https://www.ons.gov.uk/employmentandlabourmarket",
-            "where_to_find": "ONS Labour Market → Latest release → Employment change AND unemployment rate %. Both matter.",
-            "scoring_guide": "Strong employment + low unemployment = BoE hawkish. BoE also watches wage growth closely."
+            "where_to_find": "ONS Labour market overview (latest release) → 'Unemployment rate (aged 16 and over, seasonally adjusted)' for the latest three-month period, and the figure for the previous three-month period shown in the same release.",
+            "scoring_guide": "Strong employment and low unemployment = BoE hawkish. Score the change in the unemployment rate (latest published rate against the previous published rate, both as shown by the source, to one decimal): +2 fell by 0.2 point or more · +1 fell by 0.1 point · 0 unchanged · -1 rose by 0.1 point · -2 rose by 0.2 point or more. Employment change is context only."
           },
           {
             "num": 12,
             "id": "debtgdp",
             "hub_name": "Government Debt / GDP",
-            "measure": "UK Govt Debt / GDP",
+            "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
-            "source_url": "https://www.ons.gov.uk/economy/governmentpublicsectorandtaxes/publicspending",
-            "where_to_find": "ONS Public Sector Finances → Public sector net debt as % of GDP. Note current level and trend.",
-            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/GBR",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for GBR for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "scoring_guide": "Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
             "id": "fiscal",
             "hub_name": "Fiscal Balance",
-            "measure": "UK Fiscal Balance",
+            "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
-            "source_url": "https://www.ons.gov.uk/economy/governmentpublicsectorandtaxes/publicsectorfinance",
-            "where_to_find": "ONS Public Sector Finances → Monthly borrowing figure (PSNB) and annual position. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/GBR",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for GBR for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -544,7 +544,7 @@
             "category": "Growth / Production",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "S&P Global PMI → Filter 'Japan Manufacturing' → PMI headline figure in latest release.",
-            "scoring_guide": "Japan PMI tracks China demand. Same +2/+1/0/-1/-2 scoring vs 50 threshold."
+            "scoring_guide": "Japan PMI tracks China demand. Score the headline PMI reading: +2 above 52 · +1 from 50.5 to 52 · 0 from 49.5 to 50.5 · -1 from 47 to 49.5 · -2 below 47."
           },
           {
             "num": 2,
@@ -554,7 +554,7 @@
             "category": "Growth / Demand",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "Same site → Filter 'Japan Services' or 'Japan Composite' → PMI headline figure.",
-            "scoring_guide": "Japan services sector has been resilient. +2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+            "scoring_guide": "Japan services sector has been resilient. Score the headline PMI reading: +2 above 54 · +1 from 51 to 54 · 0 from 50 to 51 · -1 from 47 to 50 · -2 below 47."
           },
           {
             "num": 3,
@@ -580,11 +580,11 @@
             "num": 5,
             "id": "m2",
             "hub_name": "M2 Money Supply",
-            "measure": "Japan M2 Money Supply",
+            "measure": "Japan M2 Money Supply (Bank of Japan Money Stock, M2 average amounts outstanding)",
             "category": "Monetary Conditions",
-            "source_url": "https://fred.stlouisfed.org/series/MYAGM2JPM189S",
-            "where_to_find": "FRED → Japan M2 series → Annual growth rate. Check if expanding or contracting.",
-            "scoring_guide": "+2 growing >4% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+            "source_url": "https://www.boj.or.jp/en/statistics/money/ms/index.htm",
+            "where_to_find": "Bank of Japan → Statistics → Money Stock → latest monthly release → M2, year-on-year % change (average amounts outstanding). The old FRED Japan M2 series stopped in 2017, so do not use it.",
+            "scoring_guide": "Score the year-on-year growth of M2: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 6,
@@ -594,7 +594,7 @@
             "category": "Central Bank",
             "source_url": "https://www.boj.or.jp/en/mopo/mpmdeci/state/index.htm/",
             "where_to_find": "BoJ Monetary Policy → Latest statement → Policy-Rate Balance or Uncollateralised Overnight Call Rate.",
-            "scoring_guide": "+2 hiking cycle (rare, major JPY bullish signal) · +1 hawkish hold · 0 neutral · -1 maintaining loose policy · -2 ultra-dovish / negative rates."
+            "scoring_guide": "Score the latest BoJ decision: +2 raised the policy rate · +1 held, with the statement or at least one board member pointing toward a rise · 0 held with a balanced message and no clear next step · -1 held with the message staying clearly accommodative and no hint of a rise · -2 cut the rate or announced new easing. Judge the latest meeting only; earlier moves do not count."
           },
           {
             "num": 7,
@@ -604,7 +604,7 @@
             "category": "Inflation",
             "source_url": "https://www.stat.go.jp/english/data/cpi/",
             "where_to_find": "Statistics Bureau Japan → CPI latest release → 'All items' year-on-year % change.",
-            "scoring_guide": "Historically deflationary. +2 above 2.5% sustained · +1 above 2% · 0 near 2% · -1 below 1% · -2 negative (deflation)."
+            "scoring_guide": "Japan was deflationary for decades; the BoJ now looks for 2%. Score the headline annual rate: +2 above 2.5% · +1 from 2% to 2.5% · 0 from 1% to 2% · -1 from 0% to 1% · -2 below 0%."
           },
           {
             "num": 8,
@@ -614,7 +614,7 @@
             "category": "Underlying Inflation",
             "source_url": "https://www.stat.go.jp/english/data/cpi/",
             "where_to_find": "Same Statistics Bureau page → 'All items less fresh food' = Japan Core CPI. Annual % change.",
-            "scoring_guide": "BoJ watches core CPI (ex-fresh food). Sustained above 2% = BoJ hike signal = JPY bullish."
+            "scoring_guide": "BoJ watches core CPI (excluding fresh food); sustained above 2% is a rate-hike signal and JPY bullish. Score the annual rate with the same bands as headline CPI: +2 above 2.5% · +1 from 2% to 2.5% · 0 from 1% to 2% · -1 from 0% to 1% · -2 below 0%."
           },
           {
             "num": 9,
@@ -624,46 +624,46 @@
             "category": "Pipeline Inflation",
             "source_url": "https://www.boj.or.jp/en/statistics/pi/cgpi/index.htm/",
             "where_to_find": "BoJ CGPI (Corporate Goods Price Index) → Annual rate in the latest release.",
-            "scoring_guide": "Rising CGPI = import inflation passing through = can support BoJ normalization."
+            "scoring_guide": "Rising CGPI = import inflation passing through = can support BoJ normalization. Score the annual rate: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 10,
             "id": "coreppi",
             "hub_name": "Core PPI",
-            "measure": "Japan Core CGPI YoY",
+            "measure": "Domestic CGPI excluding energy (electric power, city gas and water, petroleum and coal products), year-on-year %",
             "category": "Pipeline Inflation",
             "source_url": "https://www.boj.or.jp/en/statistics/pi/cgpi/index.htm/",
-            "where_to_find": "Same BoJ CGPI page → Domestic CGPI ex energy — core pipeline pressure.",
-            "scoring_guide": "Core CGPI ex-energy is BoJ's cleaner pipeline signal. Rising = inflationary pressure building."
+            "where_to_find": "BoJ Corporate Goods Price Index (latest release) → Domestic CGPI excluding electric power, gas and water and petroleum and coal products → year-on-year % change. Give the month it covers.",
+            "scoring_guide": "Core CGPI excluding energy is the BoJ's cleaner pipeline signal. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 11,
             "id": "employ",
             "hub_name": "Employment",
-            "measure": "Japan Employment / Jobs Ratio",
+            "measure": "Japan unemployment rate (latest month against the previous month)",
             "category": "Labour Market",
             "source_url": "https://www.stat.go.jp/english/data/roudou/",
-            "where_to_find": "Statistics Bureau → Labour Force Survey → Unemployment rate % and Jobs-to-applicants ratio (from Ministry of Health).",
-            "scoring_guide": "Jobs-to-applicants above 1.0 = tight labour market. +2 ratio rising sharply · +1 improving · 0 stable · -1 loosening · -2 rising unemployment."
+            "where_to_find": "Statistics Bureau of Japan → Labour Force Survey (latest monthly release) → unemployment rate, seasonally adjusted, for the latest month and the previous month. The jobs-to-applicants ratio is context only.",
+            "scoring_guide": "A jobs-to-applicants ratio above 1.0 = tight labour market. Score the change in the unemployment rate (latest published rate against the previous published rate, both as shown by the source, to one decimal): +2 fell by 0.2 point or more · +1 fell by 0.1 point · 0 unchanged · -1 rose by 0.1 point · -2 rose by 0.2 point or more. Employment change is context only."
           },
           {
             "num": 12,
             "id": "debtgdp",
             "hub_name": "Government Debt / GDP",
-            "measure": "Japan Govt Debt / GDP",
+            "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
-            "source_url": "https://fred.stlouisfed.org/series/DEBTTLJPA188A",
-            "where_to_find": "FRED → Japan debt/GDP → Annual figure. Japan debt is very high (~260% GDP) — watch trend direction.",
-            "scoring_guide": "The very high level is structural, so only the change is scored. Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/JPN",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for JPN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "scoring_guide": "The very high level is structural, so only the change is scored. Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
             "id": "fiscal",
             "hub_name": "Fiscal Balance",
-            "measure": "Japan Fiscal Balance",
+            "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
-            "source_url": "https://www.mof.go.jp/english/policy/budget/budget/index.html",
-            "where_to_find": "Japan MOF → Budget page → Annual fiscal surplus/deficit as % of GDP. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/JPN",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for JPN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -701,7 +701,7 @@
             "category": "Growth / Production",
             "source_url": "https://www.procure.ch/magazin/artikel/swiss-pmi/",
             "where_to_find": "Procure.ch → Latest PMI release. Site may be in German — look for the numeric PMI value in the headline.",
-            "scoring_guide": "Swiss PMI mirrors Eurozone trends. Same +2/+1/0/-1/-2 scoring vs 50 threshold."
+            "scoring_guide": "Swiss PMI mirrors Eurozone trends. Score the headline PMI reading: +2 above 52 · +1 from 50.5 to 52 · 0 from 49.5 to 50.5 · -1 from 47 to 49.5 · -2 below 47."
           },
           {
             "num": 2,
@@ -711,7 +711,7 @@
             "category": "Growth / Demand",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "S&P Global PMI → Filter 'Switzerland Services' → PMI headline figure.",
-            "scoring_guide": "Switzerland is a service-dominated economy. Services PMI above 50 = expansion."
+            "scoring_guide": "Switzerland is a service-dominated economy. Score the headline PMI reading: +2 above 54 · +1 from 51 to 54 · 0 from 50 to 51 · -1 from 47 to 50 · -2 below 47."
           },
           {
             "num": 3,
@@ -737,11 +737,11 @@
             "num": 5,
             "id": "m2",
             "hub_name": "M2 Money Supply",
-            "measure": "Swiss M2 Money Supply",
+            "measure": "Swiss M2 Money Supply (SNB monetary aggregates)",
             "category": "Monetary Conditions",
-            "source_url": "https://fred.stlouisfed.org/series/MYAGM2CHM189S",
-            "where_to_find": "FRED → Switzerland M2 series → Annual growth rate. Note if expanding or contracting.",
-            "scoring_guide": "+2 growing >4% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+            "source_url": "https://data.snb.ch/en/topics/snb/cube/snbmonagg",
+            "where_to_find": "SNB data portal → Monetary aggregates (cube snbmonagg) → M2, latest monthly level and the level for the same month a year earlier. If the portal does not show the year-on-year % change, work it out yourself. The old FRED Swiss M2 series is out of date, so do not use it.",
+            "scoring_guide": "Score the year-on-year growth of M2: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 6,
@@ -751,7 +751,7 @@
             "category": "Central Bank",
             "source_url": "https://www.snb.ch/en/the-snb/mandates-goals/statistics/statistics-pub/current_interest_exchange_rates",
             "where_to_find": "SNB → 'SNB policy rate' in the interest rate table. Check latest quarterly assessment for direction.",
-            "scoring_guide": "+2 hiking · +1 hawkish hold · 0 neutral hold · -1 dovish lean · -2 cutting or considering negative rates."
+            "scoring_guide": "Score the latest SNB quarterly assessment: +2 raised the policy rate · +1 held and signalled that a rise is possible · 0 held and said policy remains appropriate · -1 held and said it is ready to ease or to act in the currency market · -2 cut the rate, or clearly signalled a move to negative rates. Judge the latest meeting only; earlier moves do not count."
           },
           {
             "num": 7,
@@ -761,7 +761,7 @@
             "category": "Inflation",
             "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/prices/consumer-price-index.html",
             "where_to_find": "Swiss Federal Statistics → CPI → Annual % change rate in the latest release.",
-            "scoring_guide": "SNB targets 0-2%. +2 above 2% rising · +1 above 1.5% · 0 near 1% · -1 below 0.5% · -2 below 0% (deflation risk)."
+            "scoring_guide": "SNB targets 0-2%. Score the headline annual rate: +2 above 2% · +1 from 1.5% to 2% · 0 from 0.5% to 1.5% · -1 from 0% to 0.5% · -2 below 0%."
           },
           {
             "num": 8,
@@ -771,7 +771,7 @@
             "category": "Underlying Inflation",
             "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/prices/consumer-price-index.html",
             "where_to_find": "Same Swiss Statistics CPI page → Core CPI (ex energy and seasonal items) annual % change.",
-            "scoring_guide": "Swiss core CPI rarely spikes. Watch for any sustained rise above 1.5% = rare hawkish SNB signal."
+            "scoring_guide": "Swiss core inflation rarely spikes; a sustained rise is a rare hawkish SNB signal. Score the annual rate with the same bands as headline CPI: +2 above 2% · +1 from 1.5% to 2% · 0 from 0.5% to 1.5% · -1 from 0% to 0.5% · -2 below 0%."
           },
           {
             "num": 9,
@@ -781,46 +781,46 @@
             "category": "Pipeline Inflation",
             "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/prices/producer-import-price-index.html",
             "where_to_find": "Swiss Federal Statistics → Producer & Import Price Index → Annual % change.",
-            "scoring_guide": "Swiss PPI includes import prices — important given CHF's impact on import costs."
+            "scoring_guide": "Swiss PPI includes import prices, which matters given the franc's effect on import costs. Score the annual rate: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 10,
             "id": "coreppi",
             "hub_name": "Core PPI",
-            "measure": "Swiss Core PPI YoY",
+            "measure": "Swiss domestic producer prices (producer price index excluding imports), annual % change",
             "category": "Pipeline Inflation",
             "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/prices/producer-import-price-index.html",
-            "where_to_find": "Same page → Domestic producer prices only (ex imports) — this is closer to core PPI.",
-            "scoring_guide": "Domestic price pressure ex imports. Rising = modest inflationary signal for SNB."
+            "where_to_find": "Swiss Federal Statistics → Producer and import price index → 'Domestic products' (producer prices excluding imports) annual % change. Give the month it covers.",
+            "scoring_guide": "Domestic price pressure excluding imports. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 11,
             "id": "employ",
             "hub_name": "Employment",
-            "measure": "Switzerland Employment",
+            "measure": "Swiss unemployment rate (latest quarter against the previous quarter)",
             "category": "Labour Market",
             "source_url": "https://www.bfs.admin.ch/bfs/en/home/statistics/work-income/employment-working-hours.html",
-            "where_to_find": "Swiss Federal Statistics → Employment → Quarterly employment figures and unemployment rate.",
-            "scoring_guide": "Switzerland has one of the lowest unemployment rates globally. +2 very low & stable · 0 normal · -1 rising · -2 sharply rising."
+            "where_to_find": "Swiss Federal Statistics → Employment → unemployment rate (ILO definition, seasonally adjusted) for the latest quarter and the previous quarter.",
+            "scoring_guide": "Switzerland has one of the lowest unemployment rates globally, so only the change is scored. Score the change in the unemployment rate (latest published rate against the previous published rate, both as shown by the source, to one decimal): +2 fell by 0.2 point or more · +1 fell by 0.1 point · 0 unchanged · -1 rose by 0.1 point · -2 rose by 0.2 point or more. Employment change is context only."
           },
           {
             "num": 12,
             "id": "debtgdp",
             "hub_name": "Government Debt / GDP",
-            "measure": "Swiss Govt Debt / GDP",
+            "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
-            "source_url": "https://fred.stlouisfed.org/series/DEBTTLCHA188A",
-            "where_to_find": "FRED → Switzerland debt/GDP → Annual figure. Switzerland typically has very low debt — watch trend.",
-            "scoring_guide": "Debt is very low, so only the change is scored. Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/CHE",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for CHE for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "scoring_guide": "Debt is very low, so only the change is scored. Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
             "id": "fiscal",
             "hub_name": "Fiscal Balance",
-            "measure": "Swiss Fiscal Balance",
+            "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
-            "source_url": "https://www.efv.admin.ch/efv/en/home/finanzberichterstattung/bundeshaushalt_aktuell.html",
-            "where_to_find": "Swiss Federal Finance → Confederation budget → Surplus/deficit figures. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/CHE",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for CHE for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Switzerland often runs surpluses. Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -858,7 +858,7 @@
             "category": "Growth / Production",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "S&P Global PMI → Filter 'Canada Manufacturing' → PMI headline figure in latest release.",
-            "scoring_guide": "Heavily linked to US demand and commodity prices. Same threshold scoring vs 50."
+            "scoring_guide": "Heavily linked to US demand and commodity prices. Score the headline PMI reading: +2 above 52 · +1 from 50.5 to 52 · 0 from 49.5 to 50.5 · -1 from 47 to 49.5 · -2 below 47."
           },
           {
             "num": 2,
@@ -868,7 +868,7 @@
             "category": "Growth / Demand",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "Same site → Filter 'Canada Services' → PMI headline figure.",
-            "scoring_guide": "+2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+            "scoring_guide": "Score the headline PMI reading: +2 above 54 · +1 from 51 to 54 · 0 from 50 to 51 · -1 from 47 to 50 · -2 below 47."
           },
           {
             "num": 3,
@@ -898,7 +898,7 @@
             "category": "Monetary Conditions",
             "source_url": "https://fred.stlouisfed.org/series/MYAGM2CAM189S",
             "where_to_find": "FRED → Canada M2 series → Annual growth rate. Note if expanding or contracting.",
-            "scoring_guide": "+2 growing >5% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+            "scoring_guide": "Score the year-on-year growth of M2: +2 above 5% · +1 from 2% to 5% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 6,
@@ -908,7 +908,7 @@
             "category": "Central Bank",
             "source_url": "https://www.bankofcanada.ca/core-functions/monetary-policy/key-interest-rate/",
             "where_to_find": "Bank of Canada → Target overnight rate shown in LARGE TEXT at top. Check latest statement for direction.",
-            "scoring_guide": "+2 hiking · +1 hawkish hold · 0 neutral hold · -1 dovish lean · -2 cutting cycle."
+            "scoring_guide": "Score the latest BoC decision and statement: +2 raised the rate, or held while clearly signalling the next move is a rise · +1 held with the statement leaning hawkish (rates may need to stay high) · 0 held with a balanced message · -1 held with the statement leaning dovish (cuts likely) · -2 cut the rate. Judge the latest meeting only; earlier moves do not count."
           },
           {
             "num": 7,
@@ -918,7 +918,7 @@
             "category": "Inflation",
             "source_url": "https://www150.statcan.gc.ca/n1/en/subjects/prices_and_price_indexes/consumer_price_indexes",
             "where_to_find": "Statistics Canada → Consumer Price Index → '12-month change, All-items' % in the latest release.",
-            "scoring_guide": "BoC targets 2%. +2 above 3.5% · +1 above 2.5% · 0 near 2% · -1 below 1.5% · -2 below 1%."
+            "scoring_guide": "BoC targets 2%. Score the headline annual rate: +2 above 3.5% · +1 from 2.5% to 3.5% · 0 from 1.5% to 2.5% · -1 from 1% to 1.5% · -2 below 1%."
           },
           {
             "num": 8,
@@ -928,7 +928,7 @@
             "category": "Underlying Inflation",
             "source_url": "https://www.bankofcanada.ca/rates/indicators/capacity-and-inflation-pressures/inflation/",
             "where_to_find": "BoC Inflation page → CPI-Trim and CPI-Median both shown. Record both and average them.",
-            "scoring_guide": "BoC uses BOTH trim and median as core measures. Both above 2.5% = hawkish. Both falling = dovish."
+            "scoring_guide": "BoC uses both trim and median as core measures. Average the two readings first, then score the average. Score the annual rate with the same bands as headline CPI: +2 above 3.5% · +1 from 2.5% to 3.5% · 0 from 1.5% to 2.5% · -1 from 1% to 1.5% · -2 below 1%."
           },
           {
             "num": 9,
@@ -938,17 +938,17 @@
             "category": "Pipeline Inflation",
             "source_url": "https://www150.statcan.gc.ca/n1/en/subjects/prices_and_price_indexes/industrial_product_price_indexes",
             "where_to_find": "Statistics Canada → Industrial Product Price Index (IPPI) → Annual % change.",
-            "scoring_guide": "IPPI leads CPI by 1-3 months. Rising = inflationary pipeline = BoC stays hawkish."
+            "scoring_guide": "IPPI leads CPI by 1-3 months. Rising = inflationary pipeline = BoC stays hawkish. Score the annual rate: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 10,
             "id": "coreppi",
             "hub_name": "Core PPI",
-            "measure": "Canada Core IPPI YoY",
+            "measure": "Canada IPPI excluding energy and petroleum products, annual % change",
             "category": "Pipeline Inflation",
             "source_url": "https://www150.statcan.gc.ca/n1/en/subjects/prices_and_price_indexes/industrial_product_price_indexes",
-            "where_to_find": "Same Statistics Canada page → IPPI ex-energy or ex-petroleum products — this approximates core IPPI.",
-            "scoring_guide": "Core IPPI strips out oil volatility. Rising steadily = underlying inflationary pressure."
+            "where_to_find": "Statistics Canada → Industrial product price index (latest monthly release) → IPPI excluding energy and petroleum products → 12-month % change. Give the month it covers.",
+            "scoring_guide": "Core IPPI strips out oil volatility. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 11,
@@ -964,20 +964,20 @@
             "num": 12,
             "id": "debtgdp",
             "hub_name": "Government Debt / GDP",
-            "measure": "Canada Govt Debt / GDP",
+            "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
-            "source_url": "https://fred.stlouisfed.org/series/DEBTTLCAA188A",
-            "where_to_find": "FRED → Canada debt/GDP series → Annual figure and trend direction.",
-            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/CAN",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for CAN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "scoring_guide": "Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
             "id": "fiscal",
             "hub_name": "Fiscal Balance",
-            "measure": "Canada Fiscal Balance",
+            "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
-            "source_url": "https://www.canada.ca/en/department-finance/services/publications/fiscal-monitor.html",
-            "where_to_find": "Finance Canada → Fiscal Monitor → Monthly surplus/deficit figures. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/CAN",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for CAN for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -1015,7 +1015,7 @@
             "category": "Growth / Production",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "S&P Global PMI → Filter 'Australia Manufacturing' (Judo Bank PMI) → PMI headline figure.",
-            "scoring_guide": "AUD PMI tracks China demand. Same +2/+1/0/-1/-2 scoring vs 50 threshold."
+            "scoring_guide": "AUD PMI tracks China demand. Score the headline PMI reading: +2 above 52 · +1 from 50.5 to 52 · 0 from 49.5 to 50.5 · -1 from 47 to 49.5 · -2 below 47."
           },
           {
             "num": 2,
@@ -1025,7 +1025,7 @@
             "category": "Growth / Demand",
             "source_url": "https://www.spglobal.com/marketintelligence/en/mi/research-analysis/pmi.html",
             "where_to_find": "Same site → Filter 'Australia Services' (Judo Bank) → PMI headline figure.",
-            "scoring_guide": "+2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+            "scoring_guide": "Score the headline PMI reading: +2 above 54 · +1 from 51 to 54 · 0 from 50 to 51 · -1 from 47 to 50 · -2 below 47."
           },
           {
             "num": 3,
@@ -1055,7 +1055,7 @@
             "category": "Monetary Conditions",
             "source_url": "https://fred.stlouisfed.org/series/MYAGM2AUM189S",
             "where_to_find": "FRED → Australia M2 series → Annual growth rate.",
-            "scoring_guide": "+2 growing >6% · +1 moderate growth · 0 flat · -1 contracting · -2 sharply contracting."
+            "scoring_guide": "Score the year-on-year growth of M2: +2 above 6% · +1 from 2% to 6% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 6,
@@ -1065,7 +1065,7 @@
             "category": "Central Bank",
             "source_url": "https://www.rba.gov.au/statistics/cash-rate/",
             "where_to_find": "RBA → Cash rate target shown in LARGE COLOURED BOX at top. Check latest statement for direction.",
-            "scoring_guide": "+2 hiking cycle · +1 hawkish hold · 0 neutral hold · -1 dovish lean · -2 cutting cycle."
+            "scoring_guide": "Score the latest RBA decision and statement: +2 raised the rate, or held while clearly signalling the next move is a rise · +1 held with the statement leaning hawkish (rates may need to stay high) · 0 held with a balanced message · -1 held with the statement leaning dovish (cuts likely) · -2 cut the rate. Judge the latest meeting only; earlier moves do not count."
           },
           {
             "num": 7,
@@ -1075,7 +1075,7 @@
             "category": "Inflation",
             "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia",
             "where_to_find": "ABS → CPI latest release → 'All groups CPI' annual % change in the highlighted box.",
-            "scoring_guide": "RBA targets 2-3%. +2 above 4% · +1 above 3% · 0 in 2-3% band · -1 below 2% · -2 below 1.5%."
+            "scoring_guide": "RBA targets 2-3%. Score the headline annual rate: +2 above 4% · +1 from 3% to 4% · 0 from 2% to 3% · -1 from 1.5% to 2% · -2 below 1.5%."
           },
           {
             "num": 8,
@@ -1085,7 +1085,7 @@
             "category": "Underlying Inflation",
             "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/consumer-price-index-australia",
             "where_to_find": "Same ABS CPI release → 'Trimmed mean' annual % change — this is RBA's preferred core measure.",
-            "scoring_guide": "RBA watches trimmed mean most closely. Above 3% = hawkish. Falling toward 2.5% = dovish lean."
+            "scoring_guide": "RBA watches the trimmed mean most closely. Score the annual rate with the same bands as headline CPI: +2 above 4% · +1 from 3% to 4% · 0 from 2% to 3% · -1 from 1.5% to 2% · -2 below 1.5%."
           },
           {
             "num": 9,
@@ -1095,46 +1095,46 @@
             "category": "Pipeline Inflation",
             "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/producer-price-indexes-australia",
             "where_to_find": "ABS PPI → Producer Price Index quarterly release → Annual % change for final demand.",
-            "scoring_guide": "Rising PPI = inflationary pipeline building. Quarterly release — use last available if no new data."
+            "scoring_guide": "Rising PPI = inflationary pipeline building. Quarterly release: use the latest quarter. Score the annual rate: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 10,
             "id": "coreppi",
             "hub_name": "Core PPI",
-            "measure": "Australia Core PPI YoY",
+            "measure": "Australia PPI, output of the manufacturing industries, annual % change",
             "category": "Pipeline Inflation",
             "source_url": "https://www.abs.gov.au/statistics/economy/price-indexes-and-inflation/producer-price-indexes-australia",
-            "where_to_find": "Same ABS PPI release → Domestic final demand PPI ex-energy (if available) or manufacturing output prices.",
-            "scoring_guide": "Core pipeline pressure ex-commodities. Rising = inflationary environment building."
+            "where_to_find": "ABS Producer Price Indexes (latest quarterly release) → Output of the manufacturing industries → annual % change. Give the quarter it covers.",
+            "scoring_guide": "Core pipeline pressure outside the commodity swings. Quarterly release: use the latest quarter. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 11,
             "id": "employ",
             "hub_name": "Employment",
-            "measure": "Australia Employment (LFS)",
+            "measure": "Australia unemployment rate (latest month against the previous month)",
             "category": "Labour Market",
             "source_url": "https://www.abs.gov.au/statistics/labour/employment-and-unemployment/labour-force-australia",
-            "where_to_find": "ABS Labour Force → Employment change in thousands AND unemployment rate %. Both shown in headline.",
-            "scoring_guide": "+2 strong beat + falling unemployment · +1 beat · 0 in line · -1 miss · -2 large miss."
+            "where_to_find": "ABS Labour Force, Australia (latest monthly release) → unemployment rate, seasonally adjusted, for the latest month and the previous month shown in the headline table.",
+            "scoring_guide": "Score the change in the unemployment rate (latest published rate against the previous published rate, both as shown by the source, to one decimal): +2 fell by 0.2 point or more · +1 fell by 0.1 point · 0 unchanged · -1 rose by 0.1 point · -2 rose by 0.2 point or more. Employment change is context only."
           },
           {
             "num": 12,
             "id": "debtgdp",
             "hub_name": "Government Debt / GDP",
-            "measure": "Australia Govt Debt / GDP",
+            "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
-            "source_url": "https://fred.stlouisfed.org/series/DEBTTLAUA188A",
-            "where_to_find": "FRED → Australia debt/GDP → Annual figure and trend direction.",
-            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/AUS",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for AUS for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "scoring_guide": "Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
             "id": "fiscal",
             "hub_name": "Fiscal Balance",
-            "measure": "Australia Fiscal Balance",
+            "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
-            "source_url": "https://budget.gov.au/",
-            "where_to_find": "Australian Government Budget → Mid-Year Economic & Fiscal Outlook → Underlying cash balance. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/AUS",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for AUS for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -1172,7 +1172,7 @@
             "category": "Growth / Production",
             "source_url": "https://businessnz.org.nz/business-nz-pmi/",
             "where_to_find": "BusinessNZ → Latest PMI release → PMI headline number in the title or first paragraph.",
-            "scoring_guide": "NZ PMI often moves with AUD PMI. Same +2/+1/0/-1/-2 scoring vs 50 threshold."
+            "scoring_guide": "NZ PMI often moves with AUD PMI. Score the headline PMI reading: +2 above 52 · +1 from 50.5 to 52 · 0 from 49.5 to 50.5 · -1 from 47 to 49.5 · -2 below 47."
           },
           {
             "num": 2,
@@ -1182,7 +1182,7 @@
             "category": "Growth / Demand",
             "source_url": "https://businessnz.org.nz/business-nz-bni/",
             "where_to_find": "BusinessNZ → Business NZ Performance of Services Index (PSI) → Latest release headline figure.",
-            "scoring_guide": "+2 above 54 · +1 above 51 · 0 near 50 · -1 below 50 · -2 below 47."
+            "scoring_guide": "Score the headline PMI reading: +2 above 54 · +1 from 51 to 54 · 0 from 50 to 51 · -1 from 47 to 50 · -2 below 47."
           },
           {
             "num": 3,
@@ -1208,11 +1208,11 @@
             "num": 5,
             "id": "m2",
             "hub_name": "M2 Money Supply",
-            "measure": "NZ M2 Money Supply",
+            "measure": "NZ broad money (RBNZ M3)",
             "category": "Monetary Conditions",
-            "source_url": "https://fred.stlouisfed.org/series/MYAGM2NZM189S",
-            "where_to_find": "FRED → New Zealand M2 series → Annual growth rate.",
-            "scoring_guide": "+2 growing >5% · +1 moderate · 0 flat · -1 contracting · -2 sharply contracting."
+            "source_url": "https://www.rbnz.govt.nz/statistics",
+            "where_to_find": "Reserve Bank of New Zealand → Statistics → Monetary aggregates → M3 (broad money), latest month and the same month a year earlier; work out the year-on-year % change yourself if the table does not show it. The old FRED New Zealand M2 series is out of date, so do not use it.",
+            "scoring_guide": "Score the year-on-year growth of M3: +2 above 5% · +1 from 2% to 5% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 6,
@@ -1222,7 +1222,7 @@
             "category": "Central Bank",
             "source_url": "https://www.rbnz.govt.nz/monetary-policy/about-monetary-policy/official-cash-rate",
             "where_to_find": "RBNZ → Official Cash Rate shown prominently at top. Check latest MPS for direction.",
-            "scoring_guide": "+2 hiking · +1 hawkish hold · 0 neutral hold · -1 dovish lean · -2 cutting cycle."
+            "scoring_guide": "Score the latest RBNZ decision and statement: +2 raised the rate, or held while clearly signalling the next move is a rise · +1 held with the statement leaning hawkish (rates may need to stay high) · 0 held with a balanced message · -1 held with the statement leaning dovish (cuts likely) · -2 cut the rate. Judge the latest meeting only; earlier moves do not count."
           },
           {
             "num": 7,
@@ -1232,7 +1232,7 @@
             "category": "Inflation",
             "source_url": "https://www.stats.govt.nz/topics/price-indexes",
             "where_to_find": "Stats NZ → Consumer Price Index → Annual CPI % change in highlighted box.",
-            "scoring_guide": "RBNZ targets 1-3%. +2 above 3.5% · +1 above 3% · 0 in 1-3% band · -1 below 1.5% · -2 below 1%."
+            "scoring_guide": "RBNZ targets 1-3%. Score the headline annual rate: +2 above 3.5% · +1 from 3% to 3.5% · 0 from 1.5% to 3% · -1 from 1% to 1.5% · -2 below 1%."
           },
           {
             "num": 8,
@@ -1242,7 +1242,7 @@
             "category": "Underlying Inflation",
             "source_url": "https://www.stats.govt.nz/topics/price-indexes",
             "where_to_find": "Same Stats NZ CPI release → Non-tradables CPI annual % change (domestic inflation component).",
-            "scoring_guide": "Non-tradables = domestic inflation pressure RBNZ can actually control. Above 4% = sticky."
+            "scoring_guide": "Non-tradables = domestic inflation pressure RBNZ can actually control, and it normally runs above headline CPI. Score the annual rate: +2 above 4% · +1 from 3% to 4% · 0 from 2% to 3% · -1 from 1% to 2% · -2 below 1%."
           },
           {
             "num": 9,
@@ -1252,46 +1252,46 @@
             "category": "Pipeline Inflation",
             "source_url": "https://www.stats.govt.nz/topics/producer-price-indexes",
             "where_to_find": "Stats NZ → Producer Price Index → Quarterly output PPI annual % change.",
-            "scoring_guide": "Quarterly release. Rising output PPI = inflationary pipeline. Use last available if no new data."
+            "scoring_guide": "Quarterly release: use the latest quarter. Rising output PPI = inflationary pipeline. Score the annual rate: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 10,
             "id": "coreppi",
             "hub_name": "Core PPI",
-            "measure": "NZ Core PPI YoY",
+            "measure": "NZ PPI outputs, manufacturing industries, annual % change",
             "category": "Pipeline Inflation",
             "source_url": "https://www.stats.govt.nz/topics/producer-price-indexes",
-            "where_to_find": "Same Stats NZ PPI release → Input PPI ex-energy where available, or manufacturing sector PPI.",
-            "scoring_guide": "Core pipeline pressure. Rising = inflationary conditions building in domestic economy."
+            "where_to_find": "Stats NZ Producer price index (latest quarterly release) → Outputs for the manufacturing industries → annual % change. Give the quarter it covers.",
+            "scoring_guide": "Core pipeline pressure in the domestic economy. Quarterly release: use the latest quarter. Score the annual rate with the same bands as headline PPI: +2 above 4% · +1 from 2% to 4% · 0 from 0% to 2% · -1 from -2% to 0% · -2 below -2%."
           },
           {
             "num": 11,
             "id": "employ",
             "hub_name": "Employment",
-            "measure": "NZ Employment (HLFS)",
+            "measure": "NZ unemployment rate (latest quarter against the previous quarter)",
             "category": "Labour Market",
             "source_url": "https://www.stats.govt.nz/topics/labour-market",
-            "where_to_find": "Stats NZ → Household Labour Force Survey (HLFS) → Employment change AND unemployment rate %. Quarterly.",
-            "scoring_guide": "+2 strong beat + falling unemployment · +1 beat · 0 in line · -1 miss · -2 large miss."
+            "where_to_find": "Stats NZ Household Labour Force Survey (latest quarterly release) → unemployment rate for the latest quarter and the previous quarter.",
+            "scoring_guide": "Score the change in the unemployment rate (latest published rate against the previous published rate, both as shown by the source, to one decimal): +2 fell by 0.2 point or more · +1 fell by 0.1 point · 0 unchanged · -1 rose by 0.1 point · -2 rose by 0.2 point or more. Employment change is context only."
           },
           {
             "num": 12,
             "id": "debtgdp",
             "hub_name": "Government Debt / GDP",
-            "measure": "NZ Govt Debt / GDP",
+            "measure": "General government gross debt, % of GDP (IMF World Economic Outlook, series GGXWDG_NGDP)",
             "category": "Fiscal Health",
-            "source_url": "https://www.treasury.govt.nz/information-and-services/financial-management-and-advice/financial-statements-government",
-            "where_to_find": "NZ Treasury → Financial Statements → Net core Crown debt as % of GDP.",
-            "scoring_guide": "Score the change over the last year (latest figure against the one a year earlier): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXWDG_NGDP/NZL",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXWDG_NGDP). Read the values for NZL for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
+            "scoring_guide": "Score the change over the last year (last completed calendar year against the year before): +1 falling or stable (no rise) · 0 rising by less than 1 point of GDP · -1 rising by 1 to 4 points · -2 rising by more than 4 points."
           },
           {
             "num": 13,
             "id": "fiscal",
             "hub_name": "Fiscal Balance",
-            "measure": "NZ Fiscal Balance",
+            "measure": "General government net lending (+) / borrowing (-), % of GDP (IMF World Economic Outlook, series GGXCNL_NGDP; a negative number is a deficit)",
             "category": "Fiscal Health",
-            "source_url": "https://www.treasury.govt.nz/information-and-services/financial-management-and-advice/financial-statements-government",
-            "where_to_find": "Same NZ Treasury page → Core Crown residual cash or OBEGAL (operating balance) figure. Use the budget balance as a % of GDP for the latest full year and for the year before (work out the % of GDP yourself if the page shows only a money amount).",
+            "source_url": "https://www.imf.org/external/datamapper/api/v2/GGXCNL_NGDP/NZL",
+            "where_to_find": "IMF DataMapper (open the JSON file at the source address; the same series is on imf.org/external/datamapper/GGXCNL_NGDP). Read the values for NZL for the last completed calendar year and the year before it. Ignore the current year and later years, which are forecasts. State which World Economic Outlook edition the data comes from.",
             "scoring_guide": "Score the change in the budget balance as a % of GDP (latest full year against the year before): +1 surplus, or deficit narrowed by 0.5 point or more · 0 deficit moved by less than 0.5 point · -1 deficit widened by 0.5 to 1.5 points · -2 deficit widened by more than 1.5 points (a surplus that falls into deficit counts as widening)."
           },
           {
@@ -1451,6 +1451,7 @@
   "known_gaps": [
     "Volatility (10% weight) is not collected by the weekly pipeline; it is still entered by hand.",
     "ISM Manufacturing and Services PMI for the USD are typed in by hand each month (ism_fetcher.py); no free API.",
-    "The Exogenous layer in the pipeline is four structural facts (GDP, current account, policy rate, stock index). Older manual materials list oil, copper, China PMI, VIX, DXY and geopolitics. Decide which is the standard."
+    "The Exogenous layer in the pipeline is four structural facts (GDP, current account, policy rate, stock index). Older manual materials list oil, copper, China PMI, VIX, DXY and geopolitics. Decide which is the standard.",
+    "Government debt and fiscal balance for GBP, JPY, CHF, CAD, AUD and NZD come from the IMF World Economic Outlook, which is updated in April and October; the latest full year is an estimate and can be revised."
   ]
 }
