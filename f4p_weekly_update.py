@@ -41,6 +41,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 
 from f4p_spec import load_spec, indicator_definitions_block
+from direct_fetchers import DIRECT_AUTO_TAB_NAME, MAX_FACT_AGE_DAYS, facts_from_rows
 
 
 CURRENCIES = ["USD", "EUR", "GBP", "JPY", "CHF", "CAD", "AUD", "NZD"]
@@ -318,6 +319,39 @@ def read_fred_auto_facts(spreadsheet) -> dict:
     return facts
 
 
+def read_direct_auto_facts(spreadsheet, now=None) -> dict:
+    """
+    Batch 2. Reads the DIRECT AUTO tab - written daily by fred_cot_fetcher.py, which downloads 10-year yields,
+    IMF debt and deficit figures and similar straight from the official sources - and returns
+    {currency: {fact name: (value, as_of, source)}} for the seven non-USD currencies.
+
+    Like the FRED AUTO read above, this is a pure optimisation: any problem (tab missing, bad row, a figure
+    retrieved more than MAX_FACT_AGE_DAYS ago) just means the AI searches for that figure itself, the way it
+    did before. It must never be allowed to fail the actual run.
+    """
+    try:
+        rows = spreadsheet.worksheet(DIRECT_AUTO_TAB_NAME).get_all_values()
+        facts = facts_from_rows(rows, now or datetime.utcnow(), MAX_FACT_AGE_DAYS)
+    except Exception as exc:
+        print(f"[F4P Weekly Update] Could not read '{DIRECT_AUTO_TAB_NAME}' tab ({exc}) - "
+              f"the non-USD batches will search for every figure as normal.")
+        return {}
+    summary = ", ".join(f"{ccy} {len(f)}" for ccy, f in facts.items()) or "none"
+    print(f"[F4P Weekly Update] DIRECT AUTO supplied verified figures (fresh rows only): {summary}.")
+    return facts
+
+
+def search_budget(currency: str, known_facts: dict) -> int:
+    """Web searches the AI may use for one currency. Every indicator whose figure is already verified is one
+    the AI does not have to hunt for, so it needs fewer searches. USD keeps its existing budget of 12."""
+    if not known_facts:
+        return 20
+    if currency == "USD":
+        return 12
+    indicators_covered = len({name.split(" - ")[0] for name in known_facts})
+    return max(12, 20 - indicators_covered)
+
+
 def build_prompt(today: str, currency_batch: list, known_facts: dict = None, spec: dict = None) -> str:
     indicator_list = "\n".join(f"  {i+1}. {name}" for i, name in enumerate(INDICATORS))
     currency_list = ", ".join(currency_batch)
@@ -333,9 +367,22 @@ def build_prompt(today: str, currency_batch: list, known_facts: dict = None, spe
             f"already verified, do NOT search for this number, use it exactly as given."
             for name, (value, release_date, source) in known_facts.items()
         )
+        # Figures downloaded straight from the official sources (non-USD) come as a set per indicator: the
+        # figure itself, the earlier figure, and the change the score guide scores. Say which is which, so the
+        # change is not mistaken for the current_value. (USD's one extra figure has always worked as it was,
+        # so the USD prompt is left word for word as it was.)
+        supporting_note = ""
+        if currency_batch != ["USD"] and any(" - " in name for name in known_facts):
+            supporting_note = (
+                "\nA fact whose name continues after a dash is a supporting figure for the indicator named before "
+                "the dash. The row's current_value is the line for the indicator itself (the line with no dash). "
+                "Use the line marked as the earlier value or the year before as the row's prior_value, use the line "
+                "marked as the change to pick the score from that indicator's score guide, and show the figures "
+                "you used in the analysis."
+            )
         known_facts_block = f"""
 IMPORTANT - the current_value for these indicators is already verified below. Do NOT web search to re-find these specific numbers - use them exactly as given, and spend that search budget instead on finding the prior_value, forecast/consensus, and scoring context needed to score and analyze them properly:
-{fact_lines}
+{fact_lines}{supporting_note}
 """
 
     return f"""You are a professional macro FX research analyst producing the Fishin4Pips (F4P) institutional Hub Data pack for the week of {today}.
@@ -865,17 +912,23 @@ def run_hub_data(spreadsheet, today: str) -> list:
     batch_size = 1  # 1 currency per call (15 indicators) - most reliable, avoids pause_turn loops
 
     fred_facts = read_fred_auto_facts(spreadsheet)
+    direct_facts = read_direct_auto_facts(spreadsheet)
 
     for batch_num, batch in enumerate(chunk(CURRENCIES, batch_size), start=1):
         print(f"[F4P Weekly Update] Batch {batch_num}: {batch}")
-        known_facts = fred_facts if batch == ["USD"] else None
+        # USD: verified FRED figures. The other seven: figures downloaded straight from the official sources
+        # (DIRECT AUTO tab). Facts are per currency, so this only applies while each batch is one currency.
+        if batch == ["USD"]:
+            known_facts = fred_facts
+        elif len(batch) == 1:
+            known_facts = direct_facts.get(batch[0]) or None
+        else:
+            known_facts = None
         prompt = build_prompt(today, batch, known_facts=known_facts)
 
         try:
-            # USD gets a tighter search budget - up to 7 of its 15 indicators
-            # may already have a verified current_value, so it needs less
-            # searching than the other 7 currencies.
-            data = call_claude(prompt, max_uses=12 if known_facts else 20)
+            # A currency with verified figures needs fewer searches (see search_budget).
+            data = call_claude(prompt, max_uses=search_budget(batch[0], known_facts))
         except Exception as exc:
             print(f"[F4P Weekly Update] Batch {batch_num} ({batch}) FAILED: {exc}")
             print("[F4P Weekly Update] Continuing with remaining batches...")

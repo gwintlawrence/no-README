@@ -11,6 +11,8 @@ from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+import direct_fetchers
+
 FRED_API_KEY      = os.environ['FRED_API_KEY']
 GOOGLE_CREDS_JSON = os.environ['GOOGLE_CREDENTIALS']
 SPREADSHEET_ID    = '18ZgUq7uvyodHSQvreVNoCQFiS7Ks6Gp89CBbIItcPO0'
@@ -362,6 +364,64 @@ def write_to_sheet(service, fred_results, cot_results, is_friday, fred_meta=None
     ).execute()
 
 
+def write_direct_auto(service, facts, failures, now):
+    """Batch 2: the figures downloaded straight from the official sources (10-year yields, IMF debt and
+    deficit figures ...) go in their own tab, DIRECT AUTO, so nothing in the FRED AUTO layout changes.
+    Everything is rewritten each run, so a figure that is no longer fetched disappears instead of lingering."""
+    tab = direct_fetchers.DIRECT_AUTO_TAB_NAME
+    sheet = service.spreadsheets().get(spreadsheetId=SPREADSHEET_ID).execute()
+    existing = [s['properties']['title'] for s in sheet.get('sheets', [])]
+    if tab not in existing:
+        body = {'requests': [{'addSheet': {'properties': {'title': tab}}}]}
+        service.spreadsheets().batchUpdate(spreadsheetId=SPREADSHEET_ID, body=body).execute()
+        print('Tab created: ' + tab)
+
+    stamp = now.strftime('%Y-%m-%d %H:%M UTC')
+    service.spreadsheets().values().clear(
+        spreadsheetId=SPREADSHEET_ID, range=tab + '!A1:I300', body={}
+    ).execute()
+    top = [
+        ['F4P DIRECT AUTO - figures downloaded straight from the official sources - Last run: ' + stamp],
+        ['The weekly Hub update uses a row only if STATUS is OK and RETRIEVED is under 3 days old. '
+         'Anything else is searched for by the AI as before.'],
+        direct_fetchers.DIRECT_AUTO_HEADER,
+    ]
+    rows = direct_fetchers.rows_for_sheet(facts, failures, now)
+    service.spreadsheets().values().update(
+        spreadsheetId=SPREADSHEET_ID,
+        range=tab + '!A1:I' + str(len(top) + len(rows)),
+        valueInputOption='RAW',
+        body={'values': top + rows}
+    ).execute()
+
+
+def run_direct_fetch_and_write(now):
+    """Never allowed to fail the daily run: the FRED and COT parts above are what this workflow is for."""
+    try:
+        print('Fetching figures directly from official sources (Batch 2)...')
+        facts, failures = direct_fetchers.fetch_all(now.date())
+        print('Direct fetch: ' + str(len(facts)) + ' figures, ' + str(len(failures)) + ' failed.')
+    except Exception as e:
+        print('::warning::Direct fetch could not run at all: ' + str(e))
+        return
+
+    for attempt in range(1, 5):
+        try:
+            write_direct_auto(get_sheets_service(), facts, failures, now)
+            print('DIRECT AUTO tab written.')
+            return
+        except HttpError as e:
+            status = getattr(e.resp, 'status', None)
+            if status in (429, 500, 502, 503, 504) and attempt < 4:
+                time.sleep(10 * attempt)
+                continue
+            print('::warning::Could not write the DIRECT AUTO tab: ' + str(e))
+            return
+        except Exception as e:
+            print('::warning::Could not write the DIRECT AUTO tab: ' + str(e))
+            return
+
+
 def main():
     parser = argparse.ArgumentParser(description="F4P free macro + COT data fetcher.")
     parser.add_argument(
@@ -423,6 +483,8 @@ def main():
                 time.sleep(wait)
                 continue
             raise
+
+    run_direct_fetch_and_write(datetime.datetime.utcnow())
 
     print('Done. Check FRED AUTO tab in your Sheet.')
 

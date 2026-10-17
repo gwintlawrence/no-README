@@ -8,6 +8,8 @@
 #   - Runs every day at 14:00 UTC (10am ET) → FRED indicators
 #   - Runs every Friday at 21:00 UTC (5pm ET) → FRED + COT data
 #   - Writes to FRED AUTO tab in your Google Sheet
+#   - Also downloads 10-year yields, IMF debt/deficit figures and Swiss money/balance-sheet figures
+#     straight from the official sources and writes them to the DIRECT AUTO tab (Batch 2)
 #   - Never touches any other tab
 #
 # SECRETS NEEDED IN GITHUB (Settings → Secrets → Actions):
@@ -35,7 +37,7 @@ on:
 jobs:
   fetch-macro-data:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     steps:
       - name: Checkout repository
@@ -48,7 +50,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests google-auth google-auth-oauthlib google-api-python-client
+          pip install requests openpyxl google-auth google-auth-oauthlib google-api-python-client
 
       - name: Run F4P data fetcher
         env:
