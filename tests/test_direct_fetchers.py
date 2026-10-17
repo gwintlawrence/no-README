@@ -301,6 +301,31 @@ def patched(text=None, content=None, record=None):
     return Ctx()
 
 
+class BundesbankTimeSeriesLayout(unittest.TestCase):
+    """What the live run returned on 16 Oct 2026 for format=csv: a header with the series key, description rows,
+    then date, value, flag rows."""
+    KEY = "BBSSY.D.REN.EUR.A630.000000WT1010.A"
+    CSV = ('\ufeff"",%s,%s_FLAGS\n'
+           '"",Daily yield of the current 10 year federal bond, Comment (in english),,\n'
+           '"", Decimals,2,\n"", Time format code,P1D,\n"", category,,\n'
+           '2026-10-08,2.55,\n2026-10-09,2.57,\n2026-10-12,.,\n2026-10-15,2.62,\n2026-10-16,2.64,\n' % (KEY, KEY))
+
+    def test_reads_dates_and_values_and_skips_dots(self):
+        pts = d.parse_sdmx_csv(self.CSV)
+        self.assertEqual(pts[0], (day("2026-10-08"), "2.55"))
+        self.assertEqual(len(pts), 5)
+        self.assertEqual(d.clean_points(pts)[-1], (day("2026-10-16"), D("2.64")))
+        self.assertNotIn(day("2026-10-12"), [p[0] for p in d.clean_points(pts)])
+
+    def test_fetch_gives_the_right_week_earlier(self):
+        with patched(text=self.CSV):
+            facts = d.fetch_eur_yield(TODAY)
+        self.assertEqual((facts[0]["value"], facts[0]["as_of"]), ("2.64%", "2026-10-16"))
+        # one week before Friday 16 Oct is Friday 9 Oct
+        self.assertEqual((facts[1]["value"], facts[1]["as_of"]), ("2.57%", "2026-10-09"))
+        self.assertEqual(facts[2]["value"], "+0.07 points")
+
+
 class BundesbankReader(unittest.TestCase):
     CSV = ("KEY,FREQ,REF_AREA,TIME_PERIOD,OBS_VALUE,OBS_STATUS\n"
            "BBSSY.D.REN.EUR.A630.000000WT1010.A,D,DE,2026-10-08,2.55,A\n"
@@ -446,18 +471,73 @@ class SnbReader(unittest.TestCase):
             facts = d.fetch_chf_yield(TODAY)
         self.assertEqual((facts[0]["value"], facts[2]["value"]), ("0.52%", "+0.12 points"))
 
-    def test_m2_fetch_works_the_percent_out(self):
+    def m2_cube(self, vv_offset=Decimal("0")):
+        """The layout the live run showed: D0 is B or VV, D1 is the aggregate (GM1, GM2, GM3 ...)."""
         rows = []
+        levels = {}
         for y, base in ((2025, 1000000), (2026, 1030000)):
             for m in range(1, 9):
-                rows.append(["%d-%02d" % (y, m), "M2", str(base + m * 1000)])
-                rows.append(["%d-%02d" % (y, m), "M1", "5"])
+                levels[(y, m)] = base + m * 1000
+        for (y, m), v in levels.items():
+            rows.append(["%d-%02d" % (y, m), "B", "GM2", str(v)])
+            rows.append(["%d-%02d" % (y, m), "B", "GM1", "5000"])
+            if y == 2026:
+                prior = levels[(2025, m)]
+                pct = ((Decimal(v) - prior) / prior * 100 + vv_offset).quantize(Decimal("0.1"))
+                rows.append(["%d-%02d" % (y, m), "VV", "GM2", str(pct)])
+        return self.cube("snbmonagg", ["Date", "D0", "D1", "Value"], rows)
+
+    def test_m2_fetch_uses_the_level_series_and_works_the_percent_out(self):
         seen = []
-        with patched(text=self.cube("snbmonagg", ["Date", "D0", "Value"], rows), record=seen):
+        with patched(text=self.m2_cube(), record=seen):
             facts = d.fetch_chf_m2(TODAY)
         self.assertEqual(seen[0][1]["fromDate"], "2024-10")
         self.assertEqual(facts[0]["as_of"], "2026-08")
+        self.assertEqual(facts[0]["value"], "1038000 million francs")
+        self.assertEqual(facts[1]["value"], "1008000 million francs")
         self.assertEqual(facts[2]["value"], "3.0%")                  # (1038000-1008000)/1008000*100 = 2.98
+
+    def test_m2_is_refused_when_the_other_series_disagrees(self):
+        with patched(text=self.m2_cube(vv_offset=Decimal("2.5"))):
+            with self.assertRaises(d.FetchError) as ctx:
+                d.fetch_chf_m2(TODAY)
+        self.assertIn("nothing is used", str(ctx.exception))
+
+    def test_m2_without_a_gm2_series_lists_what_the_cube_holds(self):
+        text = self.cube("snbmonagg", ["Date", "D0", "D1", "Value"], [["2026-08", "B", "GM1", "5000"]])
+        with patched(text=text):
+            with self.assertRaises(d.FetchError) as ctx:
+                d.fetch_chf_m2(TODAY)
+        self.assertIn("GM1", str(ctx.exception))
+
+    def test_m2_that_does_not_look_like_a_level_is_refused(self):
+        rows = [["2026-08", "B", "GM2", "3.2"], ["2025-08", "B", "GM2", "3.1"]]
+        with patched(text=self.cube("snbmonagg", ["Date", "D0", "D1", "Value"], rows)):
+            with self.assertRaises(d.FetchError):
+                d.fetch_chf_m2(TODAY)
+
+    def test_two_ten_year_codes_are_not_guessed_between(self):
+        rows = [["2026-10-15", "10J0", "0.52"], ["2026-10-15", "10J1", "0.60"], ["2026-10-15", "5J", "0.2"],
+                ["2026-10-08", "10J0", "0.40"], ["2026-10-08", "10J1", "0.48"]]
+        with patched(text=self.cube("rendoblid", ["Date", "D0", "Value"], rows)):
+            with self.assertRaises(d.FetchError) as ctx:
+                d.fetch_chf_yield(TODAY)
+        msg = str(ctx.exception)
+        self.assertIn("10J0", msg)
+        self.assertIn("10J1", msg)
+        self.assertIn("0.60", msg)
+
+    def test_the_chosen_ten_year_code_is_used_once_it_is_set(self):
+        rows = [["2026-10-15", "10J0", "0.52"], ["2026-10-15", "10J1", "0.60"], ["2026-10-08", "10J0", "0.40"],
+                ["2026-10-08", "10J1", "0.48"]]
+        old = d.SNB_TEN_YEAR_CODE
+        d.SNB_TEN_YEAR_CODE = "10J0"
+        try:
+            with patched(text=self.cube("rendoblid", ["Date", "D0", "Value"], rows)):
+                facts = d.fetch_chf_yield(TODAY)
+        finally:
+            d.SNB_TEN_YEAR_CODE = old
+        self.assertEqual((facts[0]["value"], facts[2]["value"]), ("0.52%", "+0.12 points"))
 
     def test_balance_sheet_is_shown_in_billions(self):
         rows = [["2025-08", "T0", "800000"], ["2026-08", "T0", "840000"], ["2026-08", "T1", "840000"]]
@@ -500,6 +580,18 @@ class RbnzReader(unittest.TestCase):
         with patched(content=self.workbook("Government bond 10 year")):
             facts = d.fetch_nzd_yield(TODAY)
         self.assertEqual((facts[0]["value"], facts[2]["value"]), ("4.52%", "+0.12 points"))
+
+    def test_the_request_carries_browser_style_headers(self):
+        seen = {}
+        old = d.http_get_bytes
+        d.http_get_bytes = lambda url, params=None, headers=None: (seen.update(headers=headers) or
+                                                                    self.workbook("Government bond 10 year"))
+        try:
+            d.fetch_nzd_yield(TODAY)
+        finally:
+            d.http_get_bytes = old
+        self.assertIn("Referer", seen["headers"])
+        self.assertIn("Accept-Language", seen["headers"])
 
     def test_unrecognised_headings_are_listed(self):
         with self.assertRaises(d.FetchError) as ctx:
