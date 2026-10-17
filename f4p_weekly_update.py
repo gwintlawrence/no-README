@@ -31,6 +31,7 @@ Required environment variables / GitHub Secrets:
 import argparse
 import os
 import json
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -149,6 +150,21 @@ FRED_AUTO_INDICATOR_MAP = {
 FRED_AUTO_EXTRA_FACTS = {
     "Building Permits / Housing - % change versus the same month a year earlier (this is the figure the score guide scores)": "Building Permits YoY %",
 }
+
+
+_CITE_TAG = re.compile(r"</?cite\b[^>]*>", re.IGNORECASE)
+
+
+def strip_cite_tags(text: str) -> str:
+    """
+    Removes <cite index="...">...</cite> markers from Claude's answer, keeping the words inside.
+
+    Found on 16 Oct 2026: after the web search results came back, some answers carried citation markers inside
+    the text fields (for example <cite index="9-2">declined to 55.3</cite>). The straight double quotes in the
+    marker break the JSON, so repair_unescaped_quotes() rescued the batch but left the markers in the Institutional
+    Analysis text on the Hub. Stripping them before parsing keeps the text clean and the JSON valid.
+    """
+    return _CITE_TAG.sub("", text)
 
 
 def extract_json_object(text: str) -> str:
@@ -545,7 +561,7 @@ def call_claude(prompt: str, max_uses: int = 20, _json_retries: int = 2) -> dict
             continue
 
         # Any other stop_reason (end_turn, stop_sequence, etc.) means it's done.
-        full_text = "".join(b.text for b in message.content if b.type == "text").strip()
+        full_text = strip_cite_tags("".join(b.text for b in message.content if b.type == "text")).strip()
 
         if not full_text:
             print("[F4P Weekly Update] No text block found. Block types were: "
