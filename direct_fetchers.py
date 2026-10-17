@@ -130,7 +130,7 @@ def clean_points(points):
     """Sorted list of (date, Decimal), one per date (the last one wins), blanks dropped."""
     by_date = {}
     for d, v in points:
-        if v is None or str(v).strip() in ("", "-", "..", "NA", "n.a.", "N/A"):
+        if v is None or str(v).strip() in ("", ".", "-", "..", "NA", "n.a.", "N/A"):
             continue
         by_date[d] = to_decimal(v)
     return sorted(by_date.items())
@@ -346,10 +346,14 @@ def parse_sdmx_csv(text):
     if not rows:
         raise FetchError("empty response")
     header = [c.strip().upper() for c in rows[0]]
-    try:
+    if "TIME_PERIOD" in header and "OBS_VALUE" in header:
         t_i, v_i = header.index("TIME_PERIOD"), header.index("OBS_VALUE")
-    except ValueError:
-        raise FetchError("no TIME_PERIOD / OBS_VALUE columns. Start of response: %s" % snippet(text))
+    elif len(header) >= 2 and header[0] == "" and "." in header[1]:
+        # The layout the Bundesbank returned in the first live run (16 Oct 2026): one header row with the series
+        # key in the second column, some description rows, then data rows of date, value, flag.
+        t_i, v_i = 0, 1
+    else:
+        raise FetchError("neither the SDMX nor the time-series layout. Start of response: %s" % snippet(text))
     points = []
     for r in rows[1:]:
         if len(r) > max(t_i, v_i):
@@ -563,6 +567,7 @@ SNB_YIELD_CUBE = "rendoblid"
 SNB_M2_CUBE = "snbmonagg"
 SNB_BALANCE_SHEET_CUBE = "snbbipo"
 SNB_TEN_YEAR_CODES = ("10J", "10Y", "10", "10 years", "10 Jahre")
+SNB_TEN_YEAR_CODE = None   # set to "10J0" or "10J1" once checked against the SNB page (see snb_ten_year_rows)
 
 RBNZ_B2_URL = ("https://www.rbnz.govt.nz/-/media/project/sites/rbnz/files/statistics/series/b/b2/hb2-daily.xlsx")
 
@@ -608,8 +613,15 @@ def fetch_aud_yield(today):
                        "Reserve Bank of Australia, table F2, Australian Government 10 year bond (daily)", today)
 
 
+RBNZ_HEADERS = {
+    "Accept": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*;q=0.8",
+    "Accept-Language": "en-NZ,en;q=0.9",
+    "Referer": "https://www.rbnz.govt.nz/statistics/series/exchange-and-interest-rates/wholesale-interest-rates",
+}
+
+
 def fetch_nzd_yield(today):
-    return yield_facts("NZD", parse_rbnz_b2(http_get_bytes(RBNZ_B2_URL)),
+    return yield_facts("NZD", parse_rbnz_b2(http_get_bytes(RBNZ_B2_URL, headers=RBNZ_HEADERS)),
                        "Reserve Bank of New Zealand, table B2, 10-year government bond yield (daily)", today)
 
 
@@ -617,9 +629,27 @@ def snb_cube_text(cube, from_date):
     return http_get_text(SNB_CUBE_URL % cube, params={"fromDate": from_date})
 
 
+def snb_ten_year_rows(dims, rows):
+    """The cube's 10-year rows. The first live run (16 Oct 2026) showed two 10-year codes, 10J0 and 10J1.
+    If SNB_TEN_YEAR_CODE is set, that one is used. Otherwise, when more than one code starts with 10J,
+    nothing is guessed: the error lists each code's latest value so the right one can be chosen by comparing
+    with the SNB's own published 10-year spot rate."""
+    if SNB_TEN_YEAR_CODE:
+        return snb_series(dims, rows, [SNB_TEN_YEAR_CODE], "the 10-year Swiss Confederation bond yield")
+    codes = sorted({r[dim] for dim in dims for r in rows if r.get(dim, "").startswith("10J")})
+    if len(codes) <= 1:
+        return snb_series(dims, rows, codes or SNB_TEN_YEAR_CODES, "the 10-year Swiss Confederation bond yield")
+    latest = {}
+    for code in codes:
+        mine = sorted((r["Date"], r["Value"]) for r in rows if code in [r.get(dim) for dim in dims])
+        latest[code] = mine[-1] if mine else None
+    raise FetchError("the cube has several 10-year series and which one is the SNB's 10-year spot rate is not "
+                     "settled yet. Latest value of each (date, value): %s" % latest)
+
+
 def fetch_chf_yield(today):
     dims, rows = parse_snb_cube(snb_cube_text(SNB_YIELD_CUBE, days_before(today, 30).isoformat()))
-    picked = snb_series(dims, rows, SNB_TEN_YEAR_CODES, "the 10-year Swiss Confederation bond yield")
+    picked = snb_ten_year_rows(dims, rows)
     points = [(parse_date(r["Date"], ["%Y-%m-%d"]), r["Value"]) for r in picked]
     return yield_facts("CHF", points,
                        "Swiss National Bank data portal, cube %s (10-year Swiss Confederation bond spot rate, daily)"
@@ -639,8 +669,49 @@ def snb_monthly_points(cube, code, what, today):
     return out
 
 
+def snb_m2_points(dims, rows):
+    """Swiss M2 monthly levels from the snbmonagg cube. The first live run showed the cube holds the aggregate
+    in one dimension (GM1, GM2, GM3 ... ) and a second dimension with two kinds of series (B and VV). The level
+    series is the one with the large numbers; the other is expected to be the year-on-year per cent change, and it
+    is used as a cross-check: if it disagrees with the change worked out from the levels, nothing is used."""
+    agg_dim = next((dim for dim in dims if any(r.get(dim) == "GM2" for r in rows)), None)
+    if agg_dim is None:
+        raise FetchError("no GM2 (M2) in the cube; it holds %s" % {dim: sorted({r.get(dim) for r in rows})[:30] for dim in dims})
+    picked = [r for r in rows if r.get(agg_dim) == "GM2"]
+    other = [dim for dim in dims if dim != agg_dim]
+    groups = {}
+    for r in picked:
+        try:
+            dt = parse_date(r["Date"], ["%Y-%m", "%Y-%m-%d"])
+            groups.setdefault(tuple(r.get(dim) for dim in other), {})[(dt.year, dt.month)] = to_decimal(r["Value"])
+        except FetchError:
+            continue
+    if not groups:
+        raise FetchError("no monthly M2 values found")
+    ranked = sorted(groups.items(), key=lambda kv: abs(kv[1][max(kv[1])]), reverse=True)
+    level_key, level = ranked[0]
+    latest_key = max(level)
+    if abs(level[latest_key]) < 1000:
+        raise FetchError("the largest M2 series is only %s, so it does not look like a level in millions; series seen: %s"
+                         % (plain(level[latest_key]), {k: plain(v[max(v)]) for k, v in groups.items()}))
+    year_ago = (latest_key[0] - 1, latest_key[1])
+    if len(ranked) > 1 and year_ago in level and level[year_ago] != 0:
+        computed = (level[latest_key] - level[year_ago]) / level[year_ago] * 100
+        checks = []
+        for key, series in ranked[1:]:
+            if latest_key in series and abs(series[latest_key]) <= 100:
+                checks.append((key, series[latest_key]))
+        if checks and not any(abs(v - computed) <= Decimal("0.3") for _k, v in checks):
+            raise FetchError("the M2 levels give %s%% for %04d-%02d but the cube's other series say %s, so the series "
+                             "are not what was assumed and nothing is used" % (
+                                 plain(computed.quantize(Decimal("0.1"))), latest_key[0], latest_key[1],
+                                 {k: plain(v) for k, v in checks}))
+    return sorted(level.items())
+
+
 def fetch_chf_m2(today):
-    pts = snb_monthly_points(SNB_M2_CUBE, "M2", "Swiss M2", today)
+    dims, rows = parse_snb_cube(snb_cube_text(SNB_M2_CUBE, "%04d-%02d" % (today.year - 2, today.month)))
+    pts = snb_m2_points(dims, rows)
     return yoy_facts("CHF", M2_NAME, pts, "Swiss National Bank data portal, cube %s, aggregate M2" % SNB_M2_CUBE,
                      today, "million francs", 75, "Swiss M2")
 
